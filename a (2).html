@@ -1,0 +1,3422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Network Configuration Manager</title>
+
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+  <style>
+    :root {
+      --accent: #4a90e2;
+      --bg-from: #667eea;
+      --bg-to: #764ba2;
+      --golden: #f39c12;
+    }
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, var(--bg-from) 0%, var(--bg-to) 100%);
+      margin: 12px;
+    }
+    .app-frame { background: #f6f8fb; border-radius: 8px; box-shadow: 0 8px 26px rgba(0,0,0,0.18); overflow: hidden; }
+    .app-header { background: linear-gradient(90deg,var(--accent),#357abd); color: #fff; padding: 10px 16px; display:flex; align-items:center; justify-content:space-between; }
+    .app-header .logo { background:#fff; color:var(--accent); padding:6px 10px; border-radius:6px; font-weight:700; margin-right:10px; }
+    .content { padding: 14px; background: #fff; }
+    .sidebar { padding: 12px; background: #fafbfd; border-right: 1px solid #e9eef6; min-height: 640px; }
+    .sidebar .list-group-item { border-radius: 6px; margin-bottom:6px; cursor:pointer; }
+    .sidebar .list-group-item.active { background: var(--accent); color: #fff; }
+    .center-col { padding: 12px; }
+    .right-col { padding: 12px; }
+    .device-list { max-height: 330px; overflow:auto; border-radius:6px; border:1px solid #eef2f6; background:#fff; }
+    .file-list { max-height: 240px; overflow:auto; border-radius:6px; border:1px solid #eef2f6; background:#fff; padding:8px; }
+    .panel { display:none; }
+    .panel.active { display:block; }
+    
+    .results-area { max-height: 420px; overflow:auto; margin-top:12px; }
+    .device-card { margin-bottom: 10px; }
+    .status-success { background:#e6ffed; border-left:5px solid #28a745; padding:8px; border-radius:4px; }
+    .status-fail { background:#fff0f0; border-left:5px solid #dc3545; padding:8px; border-radius:4px; }
+    .cmd-table { font-family: monospace; font-size: 13px; }
+    .diff-block { font-family: monospace; font-size: 13px; padding:8px; border-radius:6px; background:#0f1720; color:#e6e6e6; white-space: pre-wrap; overflow-x:auto; }
+    .diff-plus { color:#d1fae5; background:rgba(16,185,129,0.07); display:block; padding:0 6px; }
+    .diff-minus { color:#fee2e2; background:rgba(239,68,68,0.06); display:block; padding:0 6px; }
+    .small-muted { font-size:12px; color:#6c757d; }
+    .action-btn { min-width:140px; }
+    .list-group-item i { width:18px; text-align:center; display:inline-block; }
+    
+    /* Golden config styling */
+    .golden-badge { 
+      background: var(--golden); 
+      color: white; 
+      font-size: 10px; 
+      padding: 2px 6px; 
+      border-radius: 10px; 
+      margin-left: 8px;
+      display: inline-block;
+    }
+    .golden-star { color: var(--golden); font-size: 14px; margin-right: 4px; }
+    .mark-golden-btn { 
+      background: var(--golden); 
+      border-color: var(--golden); 
+      color: white;
+      font-size: 11px;
+      padding: 2px 8px;
+    }
+    .mark-golden-btn:hover { 
+      background: #e67e22; 
+      border-color: #e67e22; 
+      color: white;
+    }
+    .file-item { 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+      padding: 4px 0; 
+      border-bottom: 1px solid #f0f0f0; 
+    }
+    .file-item:last-child { border-bottom: none; }
+    .file-actions { display: flex; gap: 4px; }
+    
+    /* Download all button styling */
+    .download-all-btn {
+      background: #28a745;
+      border-color: #28a745;
+      color: white;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      margin-top: 8px;
+    }
+    .download-all-btn:hover {
+      background: #218838;
+      border-color: #218838;
+      color: white;
+    }
+    .download-all-btn i {
+      margin-right: 4px;
+    }
+    
+    /* Visibility rules (updated for new Backup/Restore UX) */
+    .panel.active#executePanel ~ .center-col .files-section,
+    .panel.active#verifyPanel ~ .center-col .files-section,
+    .panel.active#schedulePanel ~ .center-col .files-section,
+    .panel.active#backupPanel ~ .center-col .files-section {
+      display: none !important;
+    }
+    .panel.active#uploadPanel ~ .center-col .devices-section,
+    .panel.active#uploadPanel ~ .center-col .files-section {
+      display: none !important;
+    }
+    
+    /* responsive */
+    @media (max-width: 992px) {
+      .sidebar { order: 2; }
+      .center-col { order: 1; }
+      .right-col { order: 3; }
+    }
+
+    .spinner {
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid #3498db;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      margin: -20px 0 0 -20px; /* center the spinner */
+      z-index: 9999;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .small-spinner {
+      border: 2px solid rgba(0, 0, 0, 0.1);
+      border-left-color: #3498db;
+      border-radius: 50%;
+      display: inline-block;
+      vertical-align: middle;
+      width: 16px;
+      height: 16px;
+      animation: spin 1s linear infinite;
+      margin-left: 8px;
+    }
+
+    /* TIG Monitoring styles */
+    .tig-container {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .tig-status {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .tig-status:last-child {
+      border-bottom: none;
+    }
+
+    .status-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+    }
+
+    .status-running { background-color: #28a745; }
+    .status-stopped { background-color: #dc3545; }
+    .status-unknown { background-color: #6c757d; }
+
+    .grafana-embed {
+      width: 100%;
+      height: 400px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      margin-top: 15px;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    .metric-card {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      text-align: center;
+    }
+
+    .metric-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #4a90e2;
+    }
+
+    .metric-label {
+      font-size: 12px;
+      color: #6c757d;
+      margin-top: 5px;
+    }
+
+    * Enhanced TIG Panel Styles - Add to your existing <style> section */
+.tig-enhanced-panel {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  border: none;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.tig-header-enhanced {
+  background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+  color: white;
+  border: none;
+  padding: 20px;
+}
+
+.tig-title h5 {
+  font-weight: 600;
+}
+
+.tig-control-btn {
+  font-size: 12px;
+  padding: 6px 12px;
+  font-weight: 500;
+  background: rgba(255,255,255,0.15);
+  border-color: rgba(255,255,255,0.3);
+  transition: all 0.3s ease;
+}
+
+.tig-control-btn:hover {
+  background: rgba(255,255,255,0.25);
+  border-color: rgba(255,255,255,0.5);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.service-card-enhanced {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 10px;
+  padding: 16px;
+  height: 100%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  transition: all 0.3s ease;
+}
+
+.service-card-enhanced:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+
+.service-header-enhanced {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.service-icon-enhanced {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.service-icon-enhanced.influx {
+  background: linear-gradient(135deg, #22D3EE, #0EA5E9);
+}
+
+.service-icon-enhanced.grafana {
+  background: linear-gradient(135deg, #F97316, #EA580C);
+}
+
+.service-icon-enhanced.telegraf {
+  background: linear-gradient(135deg, #8B5CF6, #7C3AED);
+}
+
+.service-info {
+  flex: 1;
+}
+
+.service-name {
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 4px;
+}
+
+.status-badge-enhanced {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-badge-enhanced.running {
+  background: #D1FAE5;
+  color: #065F46;
+}
+
+.status-badge-enhanced.stopped {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
+.status-dot-enhanced {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.status-dot-enhanced.running {
+  background: #10B981;
+  animation: pulse-dot 2s infinite;
+}
+
+.status-dot-enhanced.stopped {
+  background: #EF4444;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.service-description {
+  color: #6B7280;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.metrics-container-enhanced,
+.grafana-container-enhanced,
+.config-container-enhanced {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.section-header-enhanced {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f1f5f9;
+}
+
+.metrics-grid-enhanced {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.metric-card {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  padding: 16px;
+  border-radius: 8px;
+  text-align: center;
+  border: 1px solid #e2e8f0;
+  transition: transform 0.2s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+}
+
+.grafana-embed-enhanced {
+  width: 100%;
+  height: 400px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.form-control-enhanced {
+  border: 2px solid #e5e7eb;
+  border-radius: 6px;
+  transition: border-color 0.3s ease;
+}
+
+.form-control-enhanced:focus {
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.config-actions-enhanced {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.btn-enhanced {
+  font-size: 13px;
+  padding: 8px 16px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.btn-enhanced:hover {
+  transform: translateY(-1px);
+}
+
+.alert-enhanced {
+  border-radius: 8px;
+  border: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .tig-controls {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .tig-control-btn {
+    flex: 1;
+  }
+  
+  .metrics-grid-enhanced {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+
+    /* legacy left shift from earlier request (kept as-is) */
+    #uploadPanel { margin-left: -400px; }
+
+  </style>
+</head>
+<body>
+  <div class="app-frame container-fluid">
+    <div class="app-header">
+      <div style="display:flex; align-items:center;">
+        <div class="logo">NCM</div>
+        <div><strong>Network Configuration Manager</strong></div>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div class="small-muted"> {{ user }}</div>
+        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-light">Logout</a>
+      </div>
+    </div>
+
+    <div class="content container-fluid">
+      <div class="row gx-3">
+        <div class="col-lg-2 sidebar">
+          <h6 class="mb-2">Features</h6>
+          <div class="list-group">
+            <button class="list-group-item list-group-item-action active" data-target="executePanel"><i class="fas fa-play me-2"></i> Execute Command</button>
+            <button class="list-group-item list-group-item-action" data-target="verifyPanel"><i class="fas fa-check-circle me-2"></i> Verify Command</button>
+            <button class="list-group-item list-group-item-action" data-target="backupPanel"><i class="fas fa-download me-2"></i> Backup Config</button>
+            <button class="list-group-item list-group-item-action" data-target="restorePanel"><i class="fas fa-upload me-2"></i> Restore Config</button>
+            <button class="list-group-item list-group-item-action" data-target="schedulePanel"><i class="fas fa-clock me-2"></i> Schedule Config</button>
+            <button class="list-group-item list-group-item-action" data-target="monitorPanel">
+              <i class="fas fa-desktop me-2"></i> Monitoring
+            </button>
+            <button class="list-group-item list-group-item-action" data-target="tigPanel">
+              <i class="fas fa-chart-area me-2"></i> TIG Monitoring
+            </button>
+          </div>
+        </div>
+
+        <div class="col-lg-4 center-col">
+          <!-- Devices -->
+          <div class="card mb-3 devices-section">
+            <div class="card-header">Devices</div>
+            <div class="card-body">
+              <div class="form-check mb-1">
+                <input class="form-check-input" type="checkbox" id="selectAll">
+                <label class="form-check-label small-muted" for="selectAll">Select All</label>
+              </div>
+
+              <input id="deviceSearch" class="form-control form-control-sm mb-2" placeholder="Search devices..." />
+              <div id="deviceList" class="device-list list-group mb-2">
+                {% for device in devices %}
+                <label class="list-group-item" data-device-item>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <input class="form-check-input device-checkbox" type="checkbox" name="devices" value="{{ device }}" id="dev-{{ loop.index }}">
+                    <div style="flex:1; margin-left:8px;">
+                      <div style="font-weight:600;">{{ device }}</div>
+                      <div class="small-muted">{{ device.split('(')[0] | trim }}</div>
+                    </div>
+                  </div>
+                </label>
+                {% endfor %}
+              </div>
+              <div id="deviceCount" class="small-muted">Showing {{ devices | length }} devices</div>
+            </div>
+          </div>
+
+          <!-- Files -->
+          <div class="card files-section">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span>Files (Backup / Golden)</span>
+              <div class="btn-group btn-group-sm" role="group">
+                <input type="radio" class="btn-check" name="fileMode" id="modeAll" value="all" checked autocomplete="off">
+                <label class="btn btn-outline-primary btn-sm" for="modeAll">All</label>
+
+                <input type="radio" class="btn-check" name="fileMode" id="modeBackup" value="backup" autocomplete="off">
+                <label class="btn btn-outline-primary btn-sm" for="modeBackup">Backup</label>
+
+                <input type="radio" class="btn-check" name="fileMode" id="modeGolden" value="golden" autocomplete="off">
+                <label class="btn btn-outline-warning btn-sm" for="modeGolden"><i class="fas fa-star"></i> Golden</label>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="mb-2 small-muted">Select a device from the Devices list to load files.</div>
+
+              <div id="fileList" class="file-list small-muted">Waiting for device selection</div>
+              
+              <button id="downloadAllBtn" class="btn download-all-btn btn-sm w-100" style="display: none;">
+                <i class="fas fa-download"></i> Download All Files for Device
+              </button>
+              
+              <div class="small-muted mt-2">
+                <i class="fas fa-star golden-star"></i> Golden configs are marked backups for restore purposes.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-6 right-col">
+          <div id="executePanel" class="panel active">
+            <div class="card mb-3">
+              <div class="card-header">Execute Command generate & apply</div>
+              <div class="card-body">
+                <div class="mb-2">
+                  <textarea id="promptText" class="form-control" rows="4" placeholder="Describe config or paste commands"></textarea>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                  <button id="generateBtn" class="btn btn-outline-primary action-btn"><i class="fas fa-eye"></i> Preview</button>
+                  <button id="executeBtn" class="btn btn-primary action-btn"><i class="fas fa-play"></i> Apply <span id="executeSpinner" class="small-spinner" style="display: none;"></span></button>
+                  <button id="execDownloadPdfBtn" class="btn btn-outline-secondary action-btn" style="display:none;">
+                    <i class="fas fa-file-pdf"></i> Download Summary (PDF)
+                  </button>
+                </div>
+                <div class="results-area mt-3" id="execResults"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="verifyPanel" class="panel">
+            <div class="card mb-3">
+              <div class="card-header">Verify / Run As-Is</div>
+              <div class="card-body">
+                <div class="mb-2 small-muted">Enter verify prompt or raw commands.</div>
+                <textarea id="verifyPrompt" class="form-control mb-2" rows="3" placeholder="Enter verification or raw command(s)"></textarea>
+                
+                <div class="d-flex gap-2">
+                  <button id="verifyBtn" class="btn btn-success action-btn">
+                    <i class=""></i> Run verification through AI
+                    <span id="verifySpinner" class="small-spinner" style="display: none;"></span>
+                  </button>
+
+                  <button id="runAsisBtn" class="btn btn-primary action-btn">
+                    <i class=""></i> Run Command as-is
+                    <span id="asisSpinner" class="small-spinner" style="display: none;"></span>
+                  </button>
+                  <button id="verifyDownloadPdfBtn" class="btn btn-outline-secondary action-btn" style="display:none;">
+                    <i class="fas fa-file-pdf"></i> Download Summary (PDF)
+                  </button>
+                </div>
+                <div class="results-area mt-3" id="verifyResults"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="backupPanel" class="panel">
+            <div class="card mb-3">
+              <div class="card-header">Backup take running-config</div>
+              <div class="card-body">
+                <div class="small-muted mb-2">Select devices on the left. Files panel is hidden for Backup.</div>
+                <div class="d-flex gap-2">
+                  <button id="backupBtn" class="btn btn-warning action-btn"><i class="fas fa-download"></i> Backup <span id="backupSpinner" class="small-spinner" style="display: none;"></span></button>
+                </div>
+                <div class="results-area mt-3" id="backupResults"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="restorePanel" class="panel">
+            <div class="card mb-3">
+              <div class="card-header">Restore</div>
+              <div class="card-body">
+                <div class="small-muted mb-2">Select a device to load its files, tick files in the Files panel, then click Restore.</div>
+                <div class="d-flex gap-2">
+                  <button id="restoreBtn" class="btn btn-primary action-btn">
+                    <i class="fas fa-upload"></i> Restore
+                    <span id="restoreSpinner" class="small-spinner" style="display: none;"></span>
+                  </button>
+                </div>
+                <div class="results-area mt-3" id="restoreResults"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="schedulePanel" class="panel">
+            <div class="card mb-3">
+              <div class="card-header">Schedule Backup</div>
+              <div class="card-body">
+                <div class="row g-2 align-items-center">
+                  <div class="col-auto"><input type="date" id="scheduleDate" class="form-control"></div>
+                  <div class="col-auto"><input type="time" id="scheduleTime" class="form-control"></div>
+                  <div class="col-auto"><button id="scheduleBtn" class="btn btn-secondary action-btn"><i class="fas fa-calendar-plus"></i> Schedule <span id="scheduleSpinner" class="small-spinner" style="display: none;"></span></button></div>
+                </div>
+                <div class="small-muted mt-2">Scheduler runs in Flask background thread ensure server is running.</div>
+                <div class="results-area mt-3" id="schedResults"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="monitorPanel" class="panel">
+            <div class="card mb-3">
+              <div class="card-header">Monitoring</div>
+              <div class="card-body">
+                <div class="small-muted mb-2">
+                  Select one or more devices on the left, then choose an action below.
+                </div>
+                <div class="d-flex gap-2 mb-3">
+                  <button id="healthBtn" class="btn btn-success action-btn">
+                    <i class="fas fa-heartbeat"></i> Check Health
+                    <span id="healthSpinner" class="small-spinner" style="display: none;"></span>
+                  </button>
+                  <button id="connectivityBtn" class="btn btn-info action-btn">
+                    <i class="fas fa-wifi"></i> Quick Ping
+                    <span id="connectivitySpinner" class="small-spinner" style="display: none;"></span>
+                  </button>
+                </div>
+                <div id="monitorResults" class="results-area"></div>
+              </div>
+            </div>
+          </div>
+
+  <div id="tigPanel" class="panel">
+  <div class="card mb-3 tig-enhanced-panel">
+    <!-- Enhanced Header -->
+    <div class="card-header tig-header-enhanced">
+      <div class="d-flex justify-content-between align-items-center">
+        <div class="tig-title">
+          <h5 class="mb-0 d-flex align-items-center">
+            <i class="fas fa-chart-line me-2"></i>
+            TIG Stack Monitoring
+            <span class="badge bg-light text-dark ms-2 small"></span>
+          </h5>
+        </div>
+        
+        <div class="tig-controls d-flex flex-wrap gap-2">
+          <button id="tigStatusBtn" class="btn btn-outline-light btn-sm tig-control-btn">
+            <i class="fas fa-heartbeat"></i> Status
+          </button>
+          <button id="tigStartServicesBtn" class="btn btn-outline-light btn-sm tig-control-btn">
+            <i class="fas fa-play"></i> Start
+          </button>
+          <button id="tigStopServicesBtn" class="btn btn-outline-light btn-sm tig-control-btn">
+            <i class="fas fa-stop"></i> Stop
+          </button>
+          <button id="tigConfigBtn" class="btn btn-outline-light btn-sm tig-control-btn">
+            <i class="fas fa-cog"></i> Config
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-body">
+      <!-- Service Status Grid -->
+      <div class="row g-3 mb-4">
+        <!-- InfluxDB Service -->
+        <div class="col-md-4">
+          <div class="service-card-enhanced">
+            <div class="service-header-enhanced">
+              <div class="service-icon-enhanced influx">
+                <i class="fas fa-database"></i>
+              </div>
+              <div class="service-info">
+                <div class="service-name">InfluxDB</div>
+                <div id="influxStatus" class="status-badge-enhanced stopped">
+                  <div class="status-dot-enhanced stopped"></div>
+                  <span>Checking...</span>
+                </div>
+              </div>
+            </div>
+            <div class="service-description">
+              Time-series database for storing network metrics
+            </div>
+          </div>
+        </div>
+
+        <!-- Grafana Service -->
+        <div class="col-md-4">
+          <div class="service-card-enhanced">
+            <div class="service-header-enhanced">
+              <div class="service-icon-enhanced grafana">
+                <i class="fas fa-chart-area"></i>
+              </div>
+              <div class="service-info">
+                <div class="service-name">Grafana</div>
+                <div id="grafanaStatus" class="status-badge-enhanced stopped">
+                  <div class="status-dot-enhanced stopped"></div>
+                  <span>Checking...</span>
+                </div>
+              </div>
+            </div>
+            <div class="service-description">
+              Visualization platform for dashboards
+            </div>
+          </div>
+        </div>
+
+        <!-- Telegraf Service -->
+        <div class="col-md-4">
+          <div class="service-card-enhanced">
+            <div class="service-header-enhanced">
+              <div class="service-icon-enhanced telegraf">
+                <i class="fas fa-satellite-dish"></i>
+              </div>
+              <div class="service-info">
+                <div class="service-name">Telegraf</div>
+                <div id="telegrafStatus" class="status-badge-enhanced stopped">
+                  <div class="status-dot-enhanced stopped"></div>
+                  <span>Checking...</span>
+                </div>
+              </div>
+            </div>
+            <div class="service-description">
+              Data collection agent for metrics
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Device Metrics Overview -->
+      <div id="tigMetricsContainer" class="metrics-container-enhanced" style="display: none;">
+        <div class="section-header-enhanced">
+          <h6 class="mb-0 d-flex align-items-center">
+            <i class="fas fa-chart-bar text-primary me-2"></i>
+            Network Metrics Overview
+          </h6>
+          <small class="text-muted">Real-time performance data</small>
+        </div>
+        <div id="metricsGrid" class="metrics-grid-enhanced">
+          <!-- Metrics will be populated here -->
+        </div>
+      </div>
+
+      <!-- Grafana Dashboard Embed -->
+      <div id="grafanaContainer" class="grafana-container-enhanced" style="display: none;">
+        <div class="section-header-enhanced">
+          <h6 class="mb-0 d-flex align-items-center">
+            <i class="fas fa-chart-line text-warning me-2"></i>
+            Live Dashboard
+          </h6>
+          <a id="grafanaLink" href="#" target="_blank" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-external-link-alt"></i> Open Full
+          </a>
+        </div>
+        <iframe id="grafanaEmbed" class="grafana-embed-enhanced" src="" frameborder="0"></iframe>
+      </div>
+
+      <!-- Configuration Panel -->
+      <div id="tigConfigContainer" class="config-container-enhanced" style="display: none;">
+        <div class="section-header-enhanced">
+          <h6 class="mb-0 d-flex align-items-center">
+            <i class="fas fa-sliders-h text-primary me-2"></i>
+            TIG Stack Configuration
+          </h6>
+        </div>
+        
+        <div class="alert alert-info alert-enhanced">
+          <i class="fas fa-info-circle me-2"></i>
+          Configure connection settings for TIG stack components. Ensure services are accessible at specified URLs.
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">
+              <i class="fas fa-database text-info me-1"></i> InfluxDB URL
+            </label>
+            <input type="text" id="influxUrl" class="form-control form-control-enhanced" 
+                   placeholder="http://localhost:8086" value="http://localhost:8086">
+            <small class="form-text text-muted">Database server endpoint</small>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">
+              <i class="fas fa-chart-area text-warning me-1"></i> Grafana URL
+            </label>
+            <input type="text" id="grafanaUrl" class="form-control form-control-enhanced" 
+                   placeholder="http://localhost:3000" value="http://localhost:3000">
+            <small class="form-text text-muted">Dashboard server endpoint</small>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">
+              <i class="fas fa-clock text-secondary me-1"></i> Collection Interval
+            </label>
+            <input type="number" id="collectionInterval" class="form-control form-control-enhanced" 
+                   value="30" min="10" max="300">
+            <small class="form-text text-muted">Seconds between collection</small>
+          </div>
+        </div>
+        
+        <div class="config-actions-enhanced">
+          <button id="tigSaveConfigBtn" class="btn btn-primary btn-enhanced">
+            <i class="fas fa-save"></i> Save Config
+          </button>
+          <button id="tigStartBtn" class="btn btn-success btn-enhanced">
+            <i class="fas fa-play-circle"></i> Start Collection
+          </button>
+          <button id="tigStopBtn" class="btn btn-danger btn-enhanced">
+            <i class="fas fa-stop-circle"></i> Stop Collection
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Start Guide -->
+      <div class="alert alert-warning alert-enhanced mt-3">
+        <h6 class="mb-2">
+          <i class="fas fa-lightbulb me-2"></i> Quick Start Guide
+        </h6>
+        <ol class="mb-0 ps-3">
+          <li>Select network devices from the main panel</li>
+          <li>Click <strong>"Start"</strong> to launch TIG services</li>
+          <li>Click <strong>"Start Collection"</strong> to begin monitoring</li>
+          <li>View real-time metrics and dashboards above</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+
+        </div><!-- /.right-col -->
+      </div><!-- /.row -->
+    </div><!-- /.content -->
+  </div><!-- /.app-frame -->
+
+  <!-- Preview Modal -->
+  <div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Preview / Edit Generated Commands</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small-muted">You can edit commands before applying. When ready, click <strong>Apply</strong>.</p>
+          <textarea id="previewEditable" class="form-control" rows="12" style="font-family:monospace;"></textarea>
+          <div id="previewNote" class="small-muted mt-2"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button id="applyFromPreviewBtn" class="btn btn-primary">Apply <span id="applyPreviewSpinner" class="small-spinner" style="display: none;"></span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    // Lightweight DOM helpers
+    const qs = (sel, ctx=document) => ctx.querySelector(sel);
+    const qsa = (sel, ctx=document) => Array.from((ctx || document).querySelectorAll(sel));
+
+    // Simple escape for HTML shown in UI
+    function escapeHtml(unsafe) {
+      if (!unsafe) return '';
+      return String(unsafe).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // Spinner helpers
+    function showSpinner(id) { const el = document.getElementById(id); if (el) el.style.display = 'inline-block'; }
+    function hideSpinner(id) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
+
+    // Keep which device's files are loaded for restore
+    let selectedDeviceForFiles = '';
+
+    // Toggle device inputs to radio for restore mode
+    function toggleDeviceInputsForRestore(isRestore) {
+      const deviceInputs = qsa('#deviceList input[name="devices"]');
+      deviceInputs.forEach(input => {
+        input.type = isRestore ? 'radio' : 'checkbox';
+      });
+      const selectAll = document.getElementById('selectAll');
+      if (selectAll) {
+        selectAll.closest('.form-check').style.display = isRestore ? 'none' : 'block';
+      }
+    }
+
+    // Update visibility of devices/files based on active panel
+    function updateSectionVisibility() {
+      const activePanel = document.querySelector('.panel.active');
+      if (!activePanel) return;
+
+      const devicesSection = document.querySelector('.devices-section');
+      const filesSection = document.querySelector('.files-section');
+
+      if (['executePanel','verifyPanel','schedulePanel','backupPanel','monitorPanel','tigPanel'].includes(activePanel.id)) {
+        if (devicesSection) devicesSection.style.display = 'block';
+        if (filesSection) filesSection.style.display = (activePanel.id === 'restorePanel') ? 'block' : 'none';
+      } else {
+        if (devicesSection) devicesSection.style.display = 'block';
+        if (filesSection) filesSection.style.display = 'block';
+      }
+    }
+
+    // Fetch helper: return parsed JSON if JSON, else return raw text object
+    async function fetchJsonOrText(url, options) {
+      const res = await fetch(url, options);
+      const ctype = res.headers.get('content-type') || '';
+      if (ctype.includes('application/json')) {
+        return await res.json();
+      } else {
+        const txt = await res.text();
+        return { __raw_text: txt, __status: res.status, __ok: res.ok };
+      }
+    }
+
+    // Load backup files for selected device
+    async function loadBackupFiles(deviceLabel) {
+      const el = document.querySelector('#fileList');
+      const downloadAllBtn = document.querySelector('#downloadAllBtn');
+      if (!el) return;
+      el.innerHTML = 'Loading...';
+      if (downloadAllBtn) downloadAllBtn.style.display = 'none';
+
+      if (!deviceLabel) {
+        el.innerHTML = '<div class="small-muted">Select a device to load files</div>';
+        return;
+      }
+
+      const selectedMode = document.querySelector('input[name="fileMode"]:checked')?.value || 'all';
+      try {
+        const res = await fetch(`/get_backup_files?device=${encodeURIComponent(deviceLabel)}&mode=${selectedMode}`);
+        const ctype = res.headers.get('content-type') || '';
+        if (!ctype.includes('application/json')) {
+          const txt = await res.text();
+          el.innerHTML = `<div class="text-danger">Server returned non-JSON: ${escapeHtml(txt.slice(0,1000))}</div>`;
+          return;
+        }
+        const files = await res.json();
+        if (!files || files.length === 0) {
+          el.innerHTML = `<div class="small-muted">No ${selectedMode === 'golden' ? 'golden' : selectedMode === 'backup' ? 'backup' : ''} files found</div>`;
+          return;
+        }
+
+        const deviceNameOnly = deviceLabel.split(" ")[0];
+        el.innerHTML = '';
+        files.forEach((f, idx) => {
+          const fileObj = (typeof f === 'string') ? { name: f, path: f, type: 'backup', date: '', can_mark_golden: true, device_name: deviceNameOnly } : { ...f, device_name: deviceNameOnly };
+          const id = `file-${idx}-${Math.floor(Math.random()*10000)}`;
+
+          const fileItem = document.createElement('div');
+          fileItem.className = 'file-item';
+
+          const leftSection = document.createElement('div');
+          leftSection.style.display = 'flex';
+          leftSection.style.alignItems = 'center';
+          leftSection.style.flex = '1';
+
+          const checkbox = document.createElement('input');
+          checkbox.className = 'form-check-input';
+          checkbox.type = 'checkbox';
+          checkbox.id = id;
+          checkbox.name = 'files';
+          checkbox.value = JSON.stringify(fileObj);
+
+          const label = document.createElement('label');
+          label.className = 'form-check-label ms-2';
+          label.htmlFor = id;
+          label.style.flex = '1';
+
+          const fileName = document.createElement('div');
+          fileName.style.fontWeight = '600';
+          fileName.textContent = fileObj.name;
+
+          const fileInfo = document.createElement('div');
+          fileInfo.className = 'small-muted';
+          let infoText = fileObj.type || 'backup';
+          if (fileObj.date) infoText += ` â€¢ ${new Date(fileObj.date).toLocaleDateString()}`;
+          fileInfo.textContent = infoText;
+
+          if (fileObj.type === 'golden_config') {
+            const goldenBadge = document.createElement('span');
+            goldenBadge.className = 'golden-badge';
+            goldenBadge.innerHTML = '<i class="fas fa-star"></i> Golden';
+            fileName.appendChild(goldenBadge);
+          }
+
+          label.appendChild(fileName);
+          label.appendChild(fileInfo);
+
+          leftSection.appendChild(checkbox);
+          leftSection.appendChild(label);
+
+          const actionsSection = document.createElement('div');
+          actionsSection.className = 'file-actions';
+
+          const dlBtn = document.createElement('a');
+          dlBtn.href = `/download_backup/${encodeURIComponent(deviceLabel)}/${encodeURIComponent(fileObj.path)}`;
+          dlBtn.target = '_blank';
+          dlBtn.className = 'btn btn-sm btn-outline-primary';
+          dlBtn.innerHTML = '<i class="fas fa-download"></i>';
+          dlBtn.title = 'Download with folder structure';
+
+          actionsSection.appendChild(dlBtn);
+
+          if (fileObj.can_mark_golden && fileObj.type !== 'golden_config') {
+            const goldenBtn = document.createElement('button');
+            goldenBtn.className = 'btn btn-sm mark-golden-btn';
+            goldenBtn.innerHTML = '<i class="fas fa-star"></i>';
+            goldenBtn.title = 'Mark as Golden Config';
+            goldenBtn.addEventListener('click', () => markAsGolden(fileObj, deviceNameOnly));
+            actionsSection.appendChild(goldenBtn);
+          }
+
+          fileItem.appendChild(leftSection);
+          fileItem.appendChild(actionsSection);
+          el.appendChild(fileItem);
+        });
+
+        if (files.length > 0 && downloadAllBtn) {
+          downloadAllBtn.style.display = 'block';
+          downloadAllBtn.onclick = () => downloadAllDeviceFiles(deviceLabel);
+        }
+      } catch (err) {
+        el.innerHTML = `<div class="text-danger">Failed to load files: ${escapeHtml(err.message || String(err))}</div>`;
+      }
+    }
+
+    function downloadAllDeviceFiles(deviceLabel) {
+      if (!deviceLabel) { alert('No device selected'); return; }
+      const downloadUrl = `/download_device_all/${encodeURIComponent(deviceLabel)}`;
+      const tempLink = document.createElement('a');
+      tempLink.href = downloadUrl;
+      tempLink.target = '_blank';
+      tempLink.style.display = 'none';
+      document.body.appendChild(tempLink);
+      tempLink.click();
+      document.body.removeChild(tempLink);
+    }
+
+    function updateDeviceCount(){
+      const total = qsa('.device-checkbox').length;
+      const checked = qsa('.device-checkbox:checked').length;
+      const cnt = qs('#deviceCount');
+      if (cnt) cnt.innerText = `Showing ${total} devices  ${checked} selected`;
+    }
+    function getSelectedDevices(){ return qsa('.device-checkbox:checked').map(cb => cb.value); }
+
+    // Render a device card into parent element
+    function renderDeviceCard(parentEl, deviceLabel, payload) {
+      const idSafe = btoa(deviceLabel).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+      const collapseId = `collapse-${idSafe}`;
+      const card = document.createElement('div'); card.className = 'card device-card';
+      const header = document.createElement('div'); header.className = 'card-header d-flex justify-content-between align-items-center';
+      header.innerHTML = `<div><strong>${escapeHtml(deviceLabel)}</strong> <span class="small-muted ms-2">${escapeHtml(payload.message||'')}</span></div>
+                          <div><button class="btn btn-sm btn-link" data-bs-toggle="collapse" data-bs-target="#${collapseId}">Toggle</button></div>`;
+      card.appendChild(header);
+
+      const statusDiv = document.createElement('div'); statusDiv.style.padding='8px';
+      statusDiv.className = payload.success ? 'status-success' : 'status-fail';
+      statusDiv.innerHTML = payload.success ? 'Status: Success' : `Status: Failed - ${escapeHtml(payload.message||'')}`;
+      card.appendChild(statusDiv);
+
+      const bodyWrap = document.createElement('div'); bodyWrap.className = 'collapse show'; bodyWrap.id = collapseId;
+      const body = document.createElement('div'); body.className = 'card-body';
+
+      if (payload.command_outputs && payload.command_outputs.length) {
+        const tbl = document.createElement('table'); tbl.className='table table-sm table-bordered cmd-table';
+        tbl.innerHTML = `<thead><tr><th style="width:30%">Command</th><th>Output</th></tr></thead>`;
+        const tb = document.createElement('tbody');
+        payload.command_outputs.forEach(co => {
+          const tr = document.createElement('tr');
+          const cmdTd = document.createElement('td'); cmdTd.textContent = co.command || '';
+          const outTd = document.createElement('td');
+          const pre = document.createElement('pre'); pre.style.margin=0; pre.style.whiteSpace='pre-wrap'; pre.style.fontFamily='monospace'; pre.textContent = co.output || '';
+          outTd.appendChild(pre);
+          tr.appendChild(cmdTd); tr.appendChild(outTd); tb.appendChild(tr);
+        });
+        tbl.appendChild(tb); body.appendChild(tbl);
+      }
+
+      if (payload.config_diff) {
+        const diffLabel = document.createElement('div'); diffLabel.className='small-muted'; diffLabel.style.marginTop='8px'; diffLabel.textContent='Configuration Diff:';
+        body.appendChild(diffLabel);
+        const diffBlock = document.createElement('div'); diffBlock.className='diff-block';
+        const diffLines = String(payload.config_diff).split(/\r?\n/);
+        diffLines.forEach(line => {
+          const span = document.createElement('div');
+          if (line.startsWith('+')) { span.className='diff-plus'; span.textContent = line; }
+          else if (line.startsWith('-')) { span.className='diff-minus'; span.textContent = line; }
+          else { span.textContent = line; }
+          diffBlock.appendChild(span);
+        });
+        body.appendChild(diffBlock);
+      }
+
+      if (payload.download_info) {
+        const dlBtn = document.createElement('button');
+        dlBtn.className = 'btn btn-sm btn-outline-primary mt-2';
+        dlBtn.textContent = 'Download Backup';
+        dlBtn.addEventListener('click', () => {
+          const deviceName = encodeURIComponent(payload.download_info.device_name);
+          const pathEnc = encodeURIComponent(payload.download_info.path);
+          const url = `/download_backup/${deviceName}/${pathEnc}`;
+          window.open(url, '_blank');
+        });
+        body.appendChild(dlBtn);
+      }
+
+      bodyWrap.appendChild(body); card.appendChild(bodyWrap); parentEl.prepend(card);
+    }
+
+    // Generate preview only
+    async function generatePreview(){
+      const devices = getSelectedDevices();
+      const prompt = qs('#promptText').value.trim();
+      if (!devices.length || !prompt) { alert('Select devices and enter prompt'); return; }
+
+      showSpinner('generateSpinner');
+
+      try {
+        const data = await fetchJsonOrText('/generate_config_only', {
+          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ devices, prompt })
+        });
+        if (data.__raw_text) {
+          qs('#previewEditable').value = data.__raw_text.slice(0, 5000);
+          qs('#previewNote').innerText = `Server returned ${data.__status}. Showing raw response (first 5000 chars).`;
+          new bootstrap.Modal(qs('#previewModal')).show();
+          return;
+        }
+        qs('#previewEditable').value = (data.commands || []).join('\n') || 'No commands generated';
+        qs('#previewNote').innerText = '';
+        new bootstrap.Modal(qs('#previewModal')).show();
+      } catch(err) {
+        alert('Preview failed: ' + (err.message || String(err)));
+      } finally {
+        hideSpinner('generateSpinner');
+      }
+    }
+
+    async function applyFromPreviewInternal(){
+      const devices = getSelectedDevices();
+      const commands = qs('#previewEditable').value.trim();
+      if (!devices.length || !commands) { alert('Select devices and ensure commands present'); return; }
+      await executeCommandWithPrompt(devices, commands, 'applyPreviewSpinner');
+      const modalEl = qs('#previewModal');
+      const modal = bootstrap.Modal.getInstance(modalEl);
+      if (modal) modal.hide();
+    }
+
+    // Execute: send prompt to /execute_command
+    async function executeFromPrompt(){
+      const devices = getSelectedDevices();
+      const prompt = qs('#promptText').value.trim();
+      if (!devices.length || !prompt) { alert('Select devices and enter prompt'); return; }
+      await executeCommandWithPrompt(devices, prompt, 'executeSpinner');
+    }
+
+    async function executeCommandWithPrompt(devices, prompt, spinnerId){
+      clearArea('#execResults');
+      const area = qs('#execResults');
+
+      showSpinner(spinnerId);
+
+      try {
+        const data = await fetchJsonOrText('/execute_command', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ devices, prompt })
+        });
+
+        if (data.__raw_text) {
+          area.innerHTML = `<div class="alert alert-danger">Server returned HTML (status ${data.__status}). See raw output below:<pre style="max-height:300px;overflow:auto">${escapeHtml(data.__raw_text)}</pre></div>`;
+          return;
+        }
+        if (data.error) {
+          area.innerHTML = `<div class="alert alert-danger">${escapeHtml(data.error)}</div>`;
+          return;
+        }
+
+        const results = Array.isArray(data.device_results) ? data.device_results : [];
+
+        results.forEach(devRes => {
+          renderDeviceCard(area, devRes.device, {
+            success: !!devRes.success,
+            message: devRes.message,
+            command_outputs: Array.isArray(devRes.command_outputs) ? devRes.command_outputs : [],
+            config_diff: devRes.config_diff
+          });
+        });
+
+        // Cache run for PDF
+        window.lastExecRun = {
+          prompt,
+          devices,
+          timestamp: new Date().toISOString(),
+          results: (data.device_results || []).map(r => ({
+            device: r.device,
+            success: !!r.success,
+            message: r.message || '',
+            command_outputs: Array.isArray(r.command_outputs) ? r.command_outputs : [],
+            config_diff: r.config_diff || ''
+          }))
+        };
+
+        const dlBtn = document.getElementById('execDownloadPdfBtn');
+        if (dlBtn) dlBtn.style.display = results.length ? 'inline-block' : 'none';
+
+        // Prefetch AI explanations if available (non-blocking for user)
+        const btn = document.getElementById('execDownloadPdfBtn');
+        if (btn) { btn.style.display = 'inline-block'; btn.disabled = true; btn.textContent = 'Building explanations…'; }
+        try { await ensureAiExplanations(window.lastExecRun); } catch(e){}
+        finally { if (btn){ btn.disabled = false; btn.textContent = 'Download Summary (PDF)'; } }
+
+        showPanelById('executePanel');
+      } catch (err) {
+        area.innerHTML = `<div class="text-danger">Execute failed: ${escapeHtml(err.message || String(err))}</div>`;
+      } finally {
+        hideSpinner(spinnerId);
+      }
+    }
+
+    // Verify command (AI-assisted)
+    async function verifyFromPrompt(){
+      const devices = getSelectedDevices();
+      const prompt = (qs('#verifyPrompt')?.value || qs('#promptText')?.value || '').trim();
+      if (!devices.length || !prompt) { alert('Select devices and enter verify prompt'); return; }
+      clearArea('#verifyResults'); const area = qs('#verifyResults');
+
+      showSpinner('verifySpinner');
+
+      try {
+        const data = await fetchJsonOrText('/verify_command', {
+          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ devices, prompt })
+        });
+        if (data.__raw_text) {
+          area.innerHTML = `<div class="alert alert-danger">Server returned HTML (status ${data.__status}). See raw output below:<pre style="max-height:300px;overflow:auto">${escapeHtml(data.__raw_text)}</pre></div>`;
+          return;
+        }
+        if (data.error) { area.innerHTML = `<div class="alert alert-danger">${escapeHtml(data.error)}</div>`; return; }
+
+        const results = Array.isArray(data.device_results) ? data.device_results : [];
+
+        results.forEach(devRes => {
+          renderDeviceCard(area, devRes.device, {
+            success: !!devRes.success,
+            message: devRes.message,
+            command_outputs: Array.isArray(devRes.command_outputs) ? devRes.command_outputs : [],
+            config_diff: devRes.config_diff
+          });
+        });
+
+        // Remember the run and build explanations
+window.lastVerifyRun = {
+  prompt,
+  devices,
+  timestamp: new Date().toISOString(),
+  results: (data.device_results || []).map(r => ({
+    device: r.device,
+    success: !!r.success,
+    message: r.message || '',
+    command_outputs: Array.isArray(r.command_outputs) ? r.command_outputs : [],
+    config_diff: r.config_diff || ''
+  }))
+};
+
+const vbtn = document.getElementById('verifyDownloadPdfBtn'); // or your execute PDF button id
+if (vbtn) {
+  vbtn.style.display = 'inline-block';
+  vbtn.disabled = true;
+  vbtn.textContent = 'Building explanationsâ€¦';
+}
+try { await ensureAiExplanations(window.lastVerifyRun); }
+finally {
+  if (vbtn) { vbtn.disabled = false; vbtn.textContent = 'Download Summary (PDF)'; }
+}
+
+
+        showPanelById('verifyPanel');
+      } catch(err) {
+        area.innerHTML = `<div class="text-danger">Verify failed: ${escapeHtml(err.message || String(err))}</div>`;
+      } finally {
+        hideSpinner('verifySpinner');
+      }
+    }
+
+    // Run as-is (no AI)
+    async function runAsisFromPrompt() {
+      const prompt = qs('#verifyPrompt').value.trim();
+      const devices = getSelectedDevices();
+
+      if (!prompt || devices.length === 0) {
+        alert("Please select devices and enter commands.");
+        return;
+      }
+
+      const pdfBtn = document.getElementById('verifyDownloadPdfBtn');
+      if (pdfBtn) pdfBtn.style.display = 'none';
+
+      showSpinner('asisSpinner');
+
+      try {
+        const res = await fetch('/run_asis_command', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ devices, prompt })
+        });
+
+        // Be tolerant: server might return JSON or raw text
+        const ctype = res.headers.get('content-type') || '';
+        if (!ctype.includes('application/json')) {
+          const raw = await res.text();
+          qs('#verifyResults').innerHTML = `<div class="alert alert-danger">Server returned non-JSON response: <pre style="max-height:300px;overflow:auto">${escapeHtml(raw)}</pre></div>`;
+          return;
+        }
+        const data = await res.json();
+
+        const resultsDiv = document.getElementById('verifyResults');
+        resultsDiv.innerHTML = '';
+
+        if (data.error) {
+          resultsDiv.innerHTML = `<div class="text-danger">${escapeHtml(data.error)}</div>`;
+          return;
+        }
+
+        const results = Array.isArray(data.device_results) ? data.device_results : [];
+        results.forEach(dr => {
+          renderDeviceCard(resultsDiv, dr.device, {
+            success: !!dr.success,
+            message: dr.message || '',
+            command_outputs: Array.isArray(dr.command_outputs) ? dr.command_outputs : [],
+            config_diff: dr.config_diff || ''
+          });
+        });
+
+        // cache latest VERIFY (Run As-Is) run for PDF
+        window.lastVerifyRun = {
+          prompt,
+          devices,
+          timestamp: new Date().toISOString(),
+          results: results.map(r => ({
+            device: r.device,
+            success: !!r.success,
+            message: r.message || '',
+            command_outputs: Array.isArray(r.command_outputs) ? r.command_outputs : [],
+            config_diff: r.config_diff || ''
+          }))
+        };
+        if (pdfBtn) pdfBtn.style.display = results.length ? 'inline-block' : 'none';
+
+      } catch (err) {
+        document.getElementById('verifyResults').innerHTML =
+          `<div class="text-danger">Error: ${escapeHtml(err.message || String(err))}</div>`;
+      } finally {
+        hideSpinner('asisSpinner');
+      }
+    }
+
+    // Backup selected devices
+    async function backupDevices(){
+      const devices = getSelectedDevices();
+      if (!devices.length) { alert('Select devices to backup'); return; }
+      clearArea('#backupResults'); const area = qs('#backupResults');
+
+      showSpinner('backupSpinner');
+
+      try {
+        const data = await fetchJsonOrText('/backup_devices', {
+          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ devices })
+        });
+        if (data.__raw_text) {
+          area.innerHTML = `<div class="alert alert-danger">Server returned HTML (status ${data.__status}). See raw output below:<pre style="max-height:300px;overflow:auto">${escapeHtml(data.__raw_text)}</pre></div>`;
+          return;
+        }
+        if (data.error) { area.innerHTML = `<div class="alert alert-danger">${escapeHtml(data.error)}</div>`; return; }
+
+        (data.results || []).forEach(item => {
+          let payload = { success: item.success, message: item.message, command_outputs: [], config_diff: '' };
+          if (item.download_url) {
+            try {
+              const parts = item.download_url.split('/download_backup/')[1];
+              if (parts) {
+                const [dev, path] = parts.split('/',2);
+                payload.download_info = { device_name: decodeURIComponent(dev), path: decodeURIComponent(path) };
+              }
+            } catch(e){}
+          }
+          renderDeviceCard(area, item.device, payload);
+        });
+
+        showPanelById('backupPanel');
+      } catch(err) {
+        area.innerHTML = `<div class="text-danger">Backup failed: ${escapeHtml(err.message || String(err))}</div>`;
+      } finally {
+        hideSpinner('backupSpinner');
+      }
+    }
+
+    // Mark a file as golden
+    async function markAsGolden(fileObj, deviceLabel) {
+      showSpinner('markGoldenSpinner');
+      try {
+        const deviceName = fileObj.device_name || deviceLabel.split(' ')[0];
+        const response = await fetch('/mark_as_golden', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            device_name: deviceName,
+            backup_filename: fileObj.name,
+            file_type: fileObj.type
+          })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          const toast = document.createElement('div');
+          toast.className = 'alert alert-success alert-dismissible fade show position-fixed';
+          toast.style.top = '20px';
+          toast.style.right = '20px';
+          toast.style.zIndex = '9999';
+          toast.innerHTML = `
+            <i class="fas fa-star golden-star"></i>${escapeHtml(result.message)}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          `;
+          document.body.appendChild(toast);
+          setTimeout(() => { toast.parentNode && toast.parentNode.removeChild(toast); }, 5000);
+          if (selectedDeviceForFiles) loadBackupFiles(selectedDeviceForFiles);
+        } else {
+          alert('Failed to mark as golden: ' + (result.error || 'unknown'));
+        }
+      } catch (err) {
+        alert('Error marking as golden: ' + (err.message || String(err)));
+      } finally {
+        hideSpinner('markGoldenSpinner');
+      }
+    }
+
+    // Restore selected files
+    async function restoreDevices() {
+      const checkedFiles = qsa('#fileList input[name="files"]:checked');
+      if (!checkedFiles.length) {
+        alert('Please select backup files to restore');
+        return;
+      }
+      if (!selectedDeviceForFiles) {
+        alert('Please select a device first');
+        return;
+      }
+      const selectedFiles = checkedFiles.map(cb => {
+        try { return JSON.parse(cb.value); }
+        catch (e) { console.error('Failed to parse file data:', cb.value); return null; }
+      }).filter(f => f !== null);
+
+      if (!selectedFiles.length) { alert('No valid files selected'); return; }
+
+      clearArea('#restoreResults');
+      const area = qs('#restoreResults');
+      showSpinner('restoreSpinner');
+
+      try {
+        const response = await fetch('/restore_devices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ device: selectedDeviceForFiles, files: selectedFiles })
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          const text = await response.text();
+          area.innerHTML = `<div class="alert alert-danger">Server returned non-JSON response (status ${response.status}): <pre style="max-height:300px;overflow:auto">${escapeHtml(text)}</pre></div>`;
+          return;
+        }
+
+        const data = await response.json();
+        if (data.error) { area.innerHTML = `<div class="alert alert-danger">${escapeHtml(data.error)}</div>`; return; }
+
+        (data.results || []).forEach(deviceResult => {
+          const cardHtml = `
+            <div class="card device-card mb-2">
+              <div class="card-header d-flex justify-content-between">
+                <strong>${escapeHtml(deviceResult.device)}</strong>
+                <span class="badge ${deviceResult.success ? 'bg-success' : 'bg-danger'}">
+                  ${deviceResult.success ? 'Success' : 'Failed'}
+                </span>
+              </div>
+              <div class="card-body">
+                <div class="${deviceResult.success ? 'status-success' : 'status-fail'}">
+                  ${escapeHtml(deviceResult.message || '')}
+                </div>
+                ${deviceResult.messages && deviceResult.messages.length ? `
+                  <div class="mt-2">
+                    <small class="text-muted">Restore Details:</small>
+                    <ul class="list-unstyled mt-1">
+                      ${deviceResult.messages.map(msg => `<li class="small">${escapeHtml(msg)}</li>`).join('')}
+                    </ul>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          `;
+          area.innerHTML += cardHtml;
+        });
+
+        const successCount = (data.results || []).filter(r => r.success).length;
+        const totalCount = (data.results || []).length;
+
+        if (successCount === totalCount) {
+          area.insertAdjacentHTML('afterbegin', `
+            <div class="alert alert-success mb-3">
+              <i class="fas fa-check-circle me-2"></i>
+              Restore completed successfully for all ${totalCount} device(s)
+            </div>
+          `);
+        } else {
+          area.insertAdjacentHTML('afterbegin', `
+            <div class="alert alert-warning mb-3">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              Restore completed for ${successCount} of ${totalCount} device(s)
+            </div>
+          `);
+        }
+
+        showPanelById('restorePanel');
+      } catch (err) {
+        console.error('Restore error:', err);
+        area.innerHTML = `<div class="alert alert-danger">Restore failed: ${escapeHtml(err.message || String(err))}</div>`;
+      } finally {
+        hideSpinner('restoreSpinner');
+      }
+    }
+
+    // Schedule backup
+    async function scheduleBackup(){
+      const devices = getSelectedDevices();
+      const date = qs('#scheduleDate').value;
+      const time = qs('#scheduleTime').value;
+      if (!devices.length || !date || !time) { alert('Select devices and set date/time'); return; }
+      clearArea('#schedResults'); const area = qs('#schedResults');
+
+      showSpinner('scheduleSpinner');
+
+      try {
+        const data = await fetchJsonOrText('/schedule_backup', {
+          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ devices, date, time })
+        });
+        if (data.__raw_text) {
+          area.innerHTML = `<div class="alert alert-danger">Server returned HTML (status ${data.__status}). See raw output below:<pre style="max-height:300px;overflow:auto">${escapeHtml(data.__raw_text)}</pre></div>`;
+          return;
+        }
+        if (data.error) area.innerHTML = `<div class="alert alert-danger">${escapeHtml(data.error)}</div>`;
+        else area.innerHTML = `<div class="alert alert-success">${escapeHtml(data.message || 'Scheduled')}</div>`;
+        showPanelById('schedulePanel');
+      } catch(err) {
+        area.innerHTML = `<div class="text-danger">Schedule failed: ${escapeHtml(err.message || String(err))}</div>`;
+      } finally {
+        hideSpinner('scheduleSpinner');
+      }
+    }
+
+    // Upload config file
+    async function uploadConfig(){
+      const input = qs('#uploadInput');
+      const files = input ? input.files : null;
+      if (!files || files.length === 0) { alert('Choose a file to upload'); return; }
+      const type = (qs('#uploadType') && qs('#uploadType').value) || 'backup';
+      const form = new FormData(); form.append('config_file', files[0]); form.append('config_type', type);
+      clearArea('#uploadResults'); const area = qs('#uploadResults');
+
+      showSpinner('uploadSpinner');
+
+      try {
+        const res = await fetch('/upload_config', { method:'POST', body: form });
+        const ctype = res.headers.get('content-type') || '';
+        if (!ctype.includes('application/json')) {
+          const txt = await res.text();
+          area.innerHTML = `<div class="alert alert-danger">Upload returned non-JSON: ${escapeHtml(txt.slice(0,1000))}</div>`;
+          return;
+        }
+        const data = await res.json();
+        if (data.error) area.innerHTML = `<div class="alert alert-danger">${escapeHtml(data.error)}</div>`;
+        else {
+          area.innerHTML = `<div class="alert alert-success">${escapeHtml(data.message)}</div>`;
+        }
+        showPanelById('uploadPanel');
+      } catch(err) {
+        area.innerHTML = `<div class="text-danger">Upload failed: ${escapeHtml(err.message || String(err))}</div>`;
+      } finally {
+        if (input) input.value = '';
+        hideSpinner('uploadSpinner');
+      }
+    }
+
+    // Health and connectivity checks
+    //async function healthCheck(){
+     // const devices = getSelectedDevices();
+      //if(!devices.length){ alert('Select devices'); return; }
+      //showSpinner('healthSpinner');
+      //try {
+       // const res = await fetch('/health_check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({devices})});
+       // const data = await res.json();
+       // renderHealthResults(data);
+      //} catch(e){ alert('Health check failed: '+(e.message||String(e))); }
+    //  hideSpinner('healthSpinner');
+    //}
+    async function healthCheck() {
+    const devices = getSelectedDevices();
+    if (!devices.length) { 
+        alert('Select devices'); 
+        return; 
+    }
+    
+    showSpinner('healthSpinner');
+    clearArea('#monitorResults');
+    
+    try {
+        const res = await fetch('/health_check', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({devices})
+        });
+        
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            const text = await res.text();
+            document.getElementById('monitorResults').innerHTML = 
+                `<div class="alert alert-danger">Server error: ${escapeHtml(text.slice(0, 500))}</div>`;
+            return;
+        }
+        
+        const data = await res.json();
+        console.log('Health check response:', data);
+        renderHealthResults(data);
+    } catch (e) {
+        console.error('Health check failed:', e);
+        document.getElementById('monitorResults').innerHTML = 
+            `<div class="alert alert-danger">Health check failed: ${escapeHtml(e.message || String(e))}</div>`;
+    } finally {
+        hideSpinner('healthSpinner');
+    }
+}
+
+    
+    async function connectivityCheck() {
+    const devices = getSelectedDevices();
+    if (!devices.length) { 
+        alert('Select devices'); 
+        return; 
+    }
+    
+    showSpinner('connectivitySpinner');
+    clearArea('#monitorResults');
+    
+    try {
+        const res = await fetch('/connectivity_check', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({devices})
+        });
+        
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            const text = await res.text();
+            document.getElementById('monitorResults').innerHTML = 
+                `<div class="alert alert-danger">Server error: ${escapeHtml(text.slice(0, 500))}</div>`;
+            return;
+        }
+        
+        const data = await res.json();
+        console.log('Connectivity check response:', data);
+        renderConnectivityResults(data);
+    } catch (e) {
+        console.error('Connectivity check failed:', e);
+        document.getElementById('monitorResults').innerHTML = 
+            `<div class="alert alert-danger">Connectivity check failed: ${escapeHtml(e.message || String(e))}</div>`;
+    } finally {
+        hideSpinner('connectivitySpinner');
+    }
+}
+
+    // Simple renderers (placeholders you can replace with richer visualizations)
+
+    function renderHealthResults(data) {
+    const container = document.getElementById('monitorResults');
+    if (!container) {
+        console.error('monitorResults container not found');
+        return;
+    }
+    
+    container.innerHTML = "";
+    
+    if (!data || !data.results || !Array.isArray(data.results) || data.results.length === 0) {
+        container.innerHTML = '<div class="alert alert-warning">No health data available</div>';
+        return;
+    }
+
+    // Extract data for chart
+    const labels = data.results.map(r => r.device ? r.device.split(' ')[0] : 'Unknown');
+    const cpuData = data.results.map(r => {
+        const cpu = r.cpu;
+        return (cpu !== null && cpu !== undefined && !isNaN(cpu)) ? Number(cpu) : 0;
+    });
+    const memData = data.results.map(r => {
+        const mem = r.memory;
+        return (mem !== null && mem !== undefined && !isNaN(mem)) ? Number(mem) : 0;
+    });
+
+    // Create chart container
+    const chartBox = document.createElement("div");
+    chartBox.className = "chart-box mb-4";
+    chartBox.style.cssText = `
+        background: white; 
+        border-radius: 8px; 
+        padding: 20px; 
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        height: 350px;
+    `;
+    chartBox.innerHTML = `<canvas id="healthChart_${Date.now()}" width="400" height="300"></canvas>`;
+    container.appendChild(chartBox);
+
+    const canvas = chartBox.querySelector('canvas');
+    if (!canvas) {
+        console.error('Canvas element not found');
+        return;
+    }
+    
+    const ctx = canvas.getContext("2d");
+    
+    // Destroy existing chart if it exists
+    if (window.healthChartInstance) {
+        try {
+            window.healthChartInstance.destroy();
+        } catch (e) {
+            console.log('Chart destroy failed:', e);
+        }
+    }
+
+    // Create new chart
+    window.healthChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                { 
+                    label: 'CPU %', 
+                    data: cpuData, 
+                    backgroundColor: '#4a90e2',
+                    borderColor: '#357abd',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    borderSkipped: false
+                },
+                { 
+                    label: 'Memory %', 
+                    data: memData, 
+                    backgroundColor: '#e74c3c',
+                    borderColor: '#c0392b',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    borderSkipped: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { 
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 15,
+                        font: { size: 12, weight: 'bold' }
+                    }
+                },
+                title: { 
+                    display: true, 
+                    text: 'Device Health (CPU & Memory)',
+                    font: { size: 16, weight: 'bold' },
+                    padding: { bottom: 20 }
+                }
+            },
+            scales: { 
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        font: { size: 12, weight: 'bold' },
+                        color: '#333'
+                    }
+                },
+                y: { 
+                    beginAtZero: true, 
+                    max: 100,
+                    grid: { 
+                        color: 'rgba(0,0,0,0.1)',
+                        borderDash: [2, 2]
+                    },
+                    ticks: {
+                        font: { size: 11 },
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Device details cards
+    const detailsContainer = document.createElement("div");
+    detailsContainer.className = "mt-4";
+    container.appendChild(detailsContainer);
+
+    data.results.forEach(r => {
+        const statusColor = (r.status === 'healthy') ? '#28a745' : '#dc3545';
+        const deviceName = r.device ? r.device.split(' ')[0] : 'Unknown Device';
+        const deviceIP = r.device ? (r.device.match(/\((.*)\)/)?.[1] || '') : '';
+        
+        const card = document.createElement("div");
+        card.className = "card mb-2";
+        card.style.cssText = `border-left: 4px solid ${statusColor}; box-shadow: 0 1px 3px rgba(0,0,0,0.1);`;
+        
+        card.innerHTML = `
+            <div class="card-body py-3">
+                <div class="row align-items-center">
+                    <div class="col-md-3">
+                        <div class="fw-bold">${escapeHtml(deviceName)}</div>
+                        <div class="small text-muted">${escapeHtml(deviceIP)}</div>
+                    </div>
+                    <div class="col-md-2">
+                        <span class="badge px-2 py-1" style="background-color: ${statusColor}; color: white;">
+                            ${r.status === 'healthy' ? 'Healthy' : (r.status || 'Unknown')}
+                        </span>
+                    </div>
+                    <div class="col-md-2 text-center">
+                        <div class="small text-muted">CPU Usage</div>
+                        <div class="fw-bold fs-5">${r.cpu_text || r.cpu + '%' || 'N/A'}</div>
+                    </div>
+                    <div class="col-md-2 text-center">
+                        <div class="small text-muted">Memory Usage</div>
+                        <div class="fw-bold fs-5">${r.memory_text || r.memory + '%' || 'N/A'}</div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="small text-muted">Uptime</div>
+                        <div class="small">${escapeHtml(r.uptime || 'N/A')}</div>
+                        ${r.error ? `<div class="small text-danger mt-1">${escapeHtml(r.error)}</div>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+        detailsContainer.appendChild(card);
+    });
+}
+
+function renderConnectivityResults(data) {
+    const container = document.getElementById('monitorResults');
+    if (!container) {
+        console.error('monitorResults container not found');
+        return;
+    }
+    
+    container.innerHTML = "";
+    
+    if (!data || !data.results || !Array.isArray(data.results) || data.results.length === 0) {
+        container.innerHTML = '<div class="alert alert-warning">No connectivity data available</div>';
+        return;
+    }
+    
+    // Create summary header
+    const onlineCount = data.results.filter(r => r.reachable).length;
+    const totalCount = data.results.length;
+    
+    const summaryCard = document.createElement('div');
+    summaryCard.className = 'card mb-3';
+    summaryCard.innerHTML = `
+        <div class="card-body">
+            <h6 class="card-title">Connectivity Summary</h6>
+            <div class="row text-center">
+                <div class="col-md-4">
+                    <div class="fw-bold fs-4 text-success">${onlineCount}</div>
+                    <div class="small text-muted">Online</div>
+                </div>
+                <div class="col-md-4">
+                    <div class="fw-bold fs-4 text-danger">${totalCount - onlineCount}</div>
+                    <div class="small text-muted">Offline</div>
+                </div>
+                <div class="col-md-4">
+                    <div class="fw-bold fs-4 text-info">${totalCount}</div>
+                    <div class="small text-muted">Total</div>
+                </div>
+            </div>
+        </div>
+    `;
+    container.appendChild(summaryCard);
+    
+    // Create individual device cards
+    data.results.forEach(r => {
+        const isOnline = r.reachable;
+        const statusColor = isOnline ? '#28a745' : '#dc3545';
+        const statusText = isOnline ? 'Online' : 'Offline';
+        const statusIcon = isOnline ? ' ': '';
+        const deviceName = r.device ? r.device.split(' ')[0] : 'Unknown Device';
+        const deviceIP = r.device ? (r.device.match(/\((.*)\)/)?.[1] || '') : '';
+        
+        const card = document.createElement("div");
+        card.className = "card mb-2";
+        card.style.cssText = `border-left: 4px solid ${statusColor}; box-shadow: 0 1px 3px rgba(0,0,0,0.1);`;
+        
+        card.innerHTML = `
+            <div class="card-body py-3">
+                <div class="row align-items-center">
+                    <div class="col-md-4">
+                        <div class="fw-bold">${escapeHtml(deviceName)}</div>
+                        <div class="small text-muted">${escapeHtml(deviceIP)}</div>
+                    </div>
+                    <div class="col-md-3">
+                        <span class="badge px-2 py-1" style="background-color: ${statusColor}; color: white;">
+                            ${statusIcon} ${statusText}
+                        </span>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="small">${escapeHtml(r.message || 'No additional info')}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+
+    // AI explain helpers (uses /ai/explain)
+    async function collectUniqueCommandsFromRun(run){
+      if (!run || !Array.isArray(run.results)) return [];
+      const set = new Set();
+      run.results.forEach(r => (r.command_outputs||[]).forEach(co => {
+        const cmd = (co.command || '');
+        cmd.split('\n').forEach(line => { const s = line.trim(); if (s) set.add(s); });
+      }));
+      return Array.from(set);
+    }
+    async function ensureAiExplanations(lastRun) {
+  try {
+    if (!lastRun || !Array.isArray(lastRun.results)) return;
+
+    // Build list of {command, output}
+    const items = [];
+    lastRun.results.forEach(r => {
+      (r.command_outputs || []).forEach(co => {
+        if (!co) return;
+        items.push({
+          command: String(co.command || '').trim(),
+          output: String(co.output || '')
+        });
+      });
+    });
+    if (!items.length) return;
+
+    const res = await fetch('/ai/explain', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items })
+    });
+    const data = await res.json();
+    if (!data || !data.success) return;
+
+    // Index by command for convenient lookup
+    window.aiExplainIndex = new Map();
+    (data.explanations || []).forEach(e => {
+      if (e && e.command) window.aiExplainIndex.set(e.command, e);
+    });
+  } catch (e) {
+    console.error('ensureAiExplanations failed', e);
+  }
+}
+
+    // PDF helpers using jsPDF
+    window.lastExecRun = null;
+    window.lastVerifyRun = null;
+
+    function _nowStamp() {
+      const d = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+    }
+
+    function _inferCommandUse(cmd="") {
+      const c = cmd.toLowerCase().trim();
+      if (c.startsWith('show run') || c.startsWith('show running')) return 'Show current running configuration';
+      if (c.startsWith('show ip int') || c.startsWith('show interfaces')) return 'Show interface status and IP info';
+      if (c.startsWith('ping')) return 'Connectivity test (ICMP)';
+      if (c.startsWith('copy run start') || c.startsWith('copy running')) return 'Save running config to startup';
+      if (c.startsWith('conf t') || c.startsWith('configure terminal')) return 'Enter global configuration mode';
+      if (c.startsWith('interface ')) return 'Enter interface configuration';
+      if (c.startsWith('no ')) return 'Remove/disable a setting';
+      return 'Command execution';
+    }
+
+    function _addWrapped(doc, text, x, y, maxW, lineH, pageH, bottom) {
+      const lines = doc.splitTextToSize(text, maxW);
+      for (const ln of lines) {
+        if (y > pageH - bottom) { doc.addPage(); y = 60; }
+        doc.text(ln, x, y); y += lineH;
+      }
+      return y;
+    }
+
+    // === REPLACE your entire downloadRunPdf with this ===
+function downloadRunPdf(run, kind){
+  if (!run || !Array.isArray(run.results) || !run.results.length) { alert('No results yet.'); return; }
+  const { jsPDF } = window.jspdf || {};
+  if (!jsPDF) { alert('PDF library not loaded'); return; }
+
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const left = 50, right = 50, top = 60, bottom = 60, width = pageW - left - right;
+  let y = top;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(16);
+  y = _addWrapped(doc, `Network Configuration Manager  ${kind} Summary`, left, y, width, 18, pageH, bottom);
+  doc.setFont('helvetica','normal'); doc.setFontSize(11);
+  y += 8;
+  y = _addWrapped(doc, `Date: ${new Date(run.timestamp).toString()}`, left, y, width, 14, pageH, bottom);
+  y = _addWrapped(doc, `Devices: ${(run.devices||[]).join(', ')}`, left, y, width, 14, pageH, bottom);
+  y += 6;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  y = _addWrapped(doc, 'Purpose:', left, y, width, 16, pageH, bottom);
+  doc.setFont('helvetica','normal'); 
+  y = _addWrapped(doc, run.prompt || '(not provided)', left, y, width, 14, pageH, bottom);
+  y += 8;
+
+  const richMap = run.aiRichMap || {};      // { command -> {what_it_does, how_to_use, what_the_output_means, key_points[] } }
+  const simpleMap = run.aiExpMap || {};     // { command -> single-line explanation } (fallback)
+
+  (run.results || []).forEach((r, idx) => {
+    if (idx>0) y += 6;
+    doc.setFont('helvetica','bold'); doc.setFontSize(12);
+    y = _addWrapped(doc, `Device: ${r.device}`, left, y, width, 16, pageH, bottom);
+    doc.setFont('helvetica','normal'); doc.setFontSize(11);
+    const status = r.success ? 'Success' : 'Failed';
+    y = _addWrapped(doc, `Status: ${status}${r.message ? ' ' + r.message : ''}`, left, y, width, 14, pageH, bottom);
+
+    if (Array.isArray(r.command_outputs) && r.command_outputs.length){
+      y += 6;
+      doc.setFont('helvetica','bold'); 
+      y = _addWrapped(doc, 'Commands What, How & Output:', left, y, width, 16, pageH, bottom);
+      doc.setFont('helvetica','normal');
+
+      r.command_outputs.forEach(co => {
+        const cmd = (co.command || '').trim();
+        const output = (co.output || '').trim();
+
+        // Prefer rich structured explanation; otherwise fallback to simpleMap; otherwise heuristic
+        const exp = richMap[cmd] || null;
+        const simple = simpleMap[cmd] || simpleMap[cmd.trim()] || '';
+        const fallbackLine = simple && simple.length > 3 ? simple : _inferCommandUse(cmd);
+
+        // Command
+        y = _addWrapped(doc, `â€¢ Command: ${cmd}`, left, y, width, 14, pageH, bottom);
+
+        if (exp) {
+          y = _addWrapped(doc, `  What this does: ${exp.what_it_does || fallbackLine}`, left, y, width, 14, pageH, bottom);
+          y = _addWrapped(doc, `  How to run: ${exp.how_to_use || 'Run from device CLI (exec/privileged mode). Read-only show commands are safe.'}`, left, y, width, 14, pageH, bottom);
+          y = _addWrapped(doc, `  What the output means: ${exp.what_the_output_means || ''}`, left, y, width, 14, pageH, bottom);
+          if (Array.isArray(exp.key_points) && exp.key_points.length){
+            y = _addWrapped(doc, `  Key points:`, left, y, width, 14, pageH, bottom);
+            exp.key_points.forEach(pt => {
+              y = _addWrapped(doc, `    â€¢ ${pt}`, left, y, width, 14, pageH, bottom);
+            });
+          }
+        } else {
+          y = _addWrapped(doc, `  Why/Use: ${fallbackLine}`, left, y, width, 14, pageH, bottom);
+          y = _addWrapped(doc, `  (No AI output-specific explanation available)`, left, y, width, 14, pageH, bottom);
+        }
+
+        // Output (trim super long)
+        const MAX = 4000;
+        const outText = output.length > MAX ? output.slice(0, MAX) + ' â€¦(truncated)' : (output || '(no output)');
+        y = _addWrapped(doc, `  Output:\n${outText}`, left + 12, y, width - 12, 14, pageH, bottom);
+        y += 4;
+      });
+    }
+
+    if (r.config_diff){
+      y += 6;
+      doc.setFont('helvetica','bold');
+      y = _addWrapped(doc, 'Configuration Diff:', left, y, width, 16, pageH, bottom);
+      doc.setFont('helvetica','normal');
+      y = _addWrapped(doc, r.config_diff, left+12, y, width-12, 14, pageH, bottom);
+    }
+  });
+
+  const pages = doc.internal.getNumberOfPages();
+  for (let p=1; p<=pages; p++){ doc.setPage(p); doc.setFontSize(10); doc.text(String(p), pageW-right, pageH-20, {align:'right'}); }
+  doc.save(`${kind.toLowerCase()}_summary_${_nowStamp()}.pdf`);
+}
+
+
+// === REPLACE your entire ensureAiExplanations with this ===
+// Tries rich (command+output) explanations first; falls back to commands-only.
+async function ensureAiExplanations(run){
+  if (!run) return;
+  // If already fetched rich map, we're done
+  if (run.aiRichMap) return;
+
+  try {
+    // Build unique list of items: {command, output}
+    const items = [];
+    const seen = new Set();
+    (run.results || []).forEach(r => (r.command_outputs || []).forEach(co => {
+      const cmd = String(co?.command || '').trim();
+      const out = String(co?.output || '');
+      if (!cmd) return;
+      const key = cmd; // one per command; if you prefer per (cmd+out), use `${cmd}||${out.slice(0,512)}`
+      if (seen.has(key)) return;
+      seen.add(key);
+      items.push({ command: cmd, output: out });
+    }));
+
+    // 1) Try rich, contextual explanations (command + output)
+    if (items.length){
+      const resp = await fetch('/ai/explain', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ items })
+      });
+      if (resp.ok){
+        const data = await resp.json();
+        if (data && data.success && Array.isArray(data.explanations)){
+          const richMap = {};
+          data.explanations.forEach(e => {
+            if (e && e.command) richMap[e.command.trim()] = e;
+          });
+          run.aiRichMap = richMap;
+          // Also fill simple map for backwards compatibility
+          const simpleMap = {};
+          Object.keys(richMap).forEach(k => {
+            simpleMap[k] = (richMap[k].what_it_does || '').trim();
+          });
+          run.aiExpMap = simpleMap;
+          return;
+        }
+      }
+    }
+
+    // 2) Fallback: commands-only explanation (older endpoint behavior)
+    const cmds = items.map(it => it.command);
+    if (!cmds.length) return;
+    const resp2 = await fetch('/ai/explain', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ commands: cmds })
+    });
+    if (resp2.ok){
+      const data2 = await resp2.json();
+      const map = {};
+      (data2.explanations||[]).forEach(row => {
+        if (row && row.command) map[row.command.trim()] = (row.explanation||'').trim();
+      });
+      run.aiExpMap = map; // simple string explanations (no output context)
+    }
+  } catch (e) {
+    console.warn('AI explain failed', e);
+  }
+}
+
+    // Clear area helper
+    function clearArea(sel){ const el = qs(sel); if (el) el.innerHTML = ''; }
+
+    // Show a particular panel
+    function showPanelById(id){
+      qsa('.panel').forEach(p => p.classList.remove('active'));
+      const p = qs('#' + id);
+      if (p) p.classList.add('active');
+      qsa('.sidebar .list-group-item').forEach(btn => btn.classList.remove('active'));
+      const btn = qsa(`.sidebar .list-group-item[data-target="${id}"]`)[0];
+      if (btn) btn.classList.add('active');
+
+      updateSectionVisibility();
+
+      if (id === 'restorePanel' && selectedDeviceForFiles) {
+        loadBackupFiles(selectedDeviceForFiles);
+      }
+    }
+
+    // Wire up event listeners once DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+      // Initialize visibility
+      updateSectionVisibility();
+
+      // Device search
+      qs('#deviceSearch')?.addEventListener('input', function() {
+        const q = this.value.toLowerCase();
+        let visible = 0;
+        qsa('[data-device-item]').forEach(item => {
+          const txt = item.innerText.toLowerCase();
+          if (!q || txt.includes(q)) { item.style.display = ''; visible++; }
+          else item.style.display = 'none';
+        });
+        qs('#deviceCount').innerText = `Showing ${visible} devices`;
+      });
+
+      // Select all devices
+      qs('#selectAll')?.addEventListener('change', (e) => {
+        qsa('.device-checkbox').forEach(cb => cb.checked = e.target.checked);
+        updateDeviceCount();
+      });
+
+      // Device checkbox changes
+      qsa('.device-checkbox').forEach(cb => cb.addEventListener('change', function() {
+        updateDeviceCount();
+        if (this.checked) {
+          selectedDeviceForFiles = this.value;
+          loadBackupFiles(selectedDeviceForFiles);
+        }
+      }));
+
+      // File mode filtering reloads files
+      qsa('input[name="fileMode"]').forEach(r => r.addEventListener('change', () => {
+        if (selectedDeviceForFiles) loadBackupFiles(selectedDeviceForFiles);
+      }));
+
+      // Action buttons
+      qs('#generateBtn')?.addEventListener('click', generatePreview);
+      qs('#executeBtn')?.addEventListener('click', executeFromPrompt);
+      qs('#verifyBtn')?.addEventListener('click', verifyFromPrompt);
+      qs('#backupBtn')?.addEventListener('click', backupDevices);
+      qs('#restoreBtn')?.addEventListener('click', restoreDevices);
+      qs('#scheduleBtn')?.addEventListener('click', scheduleBackup);
+      qs('#uploadBtn')?.addEventListener('click', uploadConfig);
+      qs('#runAsisBtn')?.addEventListener('click', runAsisFromPrompt);
+
+      // Preview modal apply
+      qs('#applyFromPreviewBtn')?.addEventListener('click', applyFromPreviewInternal);
+
+      // Wire PDF buttons
+      const execPdf = qs('#execDownloadPdfBtn');
+      if (execPdf) execPdf.addEventListener('click', async () => { await ensureAiExplanations(window.lastExecRun).catch(()=>{}); downloadRunPdf(window.lastExecRun, 'EXECUTE'); });
+
+      const verifyPdf = qs('#verifyDownloadPdfBtn');
+      if (verifyPdf) verifyPdf.addEventListener('click', async () => { await ensureAiExplanations(window.lastVerifyRun).catch(()=>{}); downloadRunPdf(window.lastVerifyRun, 'VERIFY'); });
+
+      // Sidebar switching
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.list-group-item');
+        if (btn && btn.dataset && btn.dataset.target) {
+          qsa('.sidebar .list-group-item').forEach(x => x.classList.remove('active'));
+          btn.classList.add('active');
+          qsa('.panel').forEach(p => p.classList.remove('active'));
+          const target = qs('#' + btn.dataset.target);
+          if (target) target.classList.add('active');
+
+          updateSectionVisibility();
+          toggleDeviceInputsForRestore(btn.dataset.target === 'restorePanel');
+          qsa('#deviceList input[name="devices"]').forEach(input=>{input.checked=false;});
+
+          if (btn.dataset.target === 'restorePanel' && selectedDeviceForFiles) {
+            loadBackupFiles(selectedDeviceForFiles);
+          }
+          e.preventDefault();
+        }
+      });
+
+      // TIG event wiring
+      const tigStatusBtn = document.getElementById('tigStatusBtn');
+      const tigConfigBtn = document.getElementById('tigConfigBtn');
+      const tigSaveConfigBtn = document.getElementById('tigSaveConfigBtn');
+      const tigStartBtn = document.getElementById('tigStartBtn');
+      const tigStopBtn = document.getElementById('tigStopBtn');
+
+      if (tigStatusBtn) tigStatusBtn.addEventListener('click', checkTigStatus);
+      if (tigConfigBtn) tigConfigBtn.addEventListener('click', () => {
+        const container = document.getElementById('tigConfigContainer');
+        container.style.display = container.style.display === 'none' ? 'block' : 'none';
+      });
+      if (tigSaveConfigBtn) tigSaveConfigBtn.addEventListener('click', saveTigConfig);
+      if (tigStartBtn) tigStartBtn.addEventListener('click', startTigCollection);
+      if (tigStopBtn) tigStopBtn.addEventListener('click', stopTigCollection);
+    });
+
+    // TIG helpers (status / start / stop / save) - these call server endpoints
+    // Replace the existing checkTigStatus function with this:
+    async function checkTigStatus() {
+    showSpinner('tigStatusSpinner');
+    try {
+        const response = await fetch('/tig_status', {
+            method: 'GET',
+            headers: {'Content-Type': 'application/json'}
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('TIG Status Response:', data);
+        
+        // Update service status displays
+        updateServiceStatus('influxStatus', data.influxdb);
+        updateServiceStatus('grafanaStatus', data.grafana);  
+        updateServiceStatus('telegrafStatus', data.telegraf);
+        
+        // Update metrics display
+        if (data.metrics) {
+            updateMetricsDisplay(data.metrics);
+        } else {
+            console.log('No metrics data received');
+        }
+        
+        // Setup Grafana embed if Grafana is running
+        if (data.grafana && data.grafana.running) {
+            setupGrafanaEmbed();
+        }
+        
+    } catch (error) {
+        console.error('TIG status check failed:', error);
+        updateServiceStatus('influxStatus', {running: false, message: 'Connection failed'});
+        updateServiceStatus('grafanaStatus', {running: false, message: 'Connection failed'}); 
+        updateServiceStatus('telegrafStatus', {running: false, message: 'Connection failed'});
+    } finally {
+        hideSpinner('tigStatusSpinner');
+    }
+}
+async function saveTigConfig() {
+    try {
+        const config = {
+            influxUrl: document.getElementById('influxUrl').value,
+            grafanaUrl: document.getElementById('grafanaUrl').value,
+            collectionInterval: parseInt(document.getElementById('collectionInterval').value) || 30
+        };
+        
+        console.log('Saving TIG config:', config);
+        
+        const response = await fetch('/tig_config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(config)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('TIG configuration saved successfully');
+        } else {
+            alert('Failed to save configuration: ' + (result.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error saving TIG config:', error);
+        alert('Error saving configuration: ' + error.message);
+    }
+}
+
+// Fixed TIG collection start function
+async function startTigCollection() {
+    try {
+        const devices = getSelectedDevices();
+        if (!devices.length) {
+            alert('Please select devices to monitor first');
+            return;
+        }
+        
+        console.log('Starting collection for devices:', devices);
+        
+        const response = await fetch('/tig_start_collection', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({devices: devices})
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(`Started monitoring ${devices.length} device(s). Data will appear shortly.`);
+            // Check status after starting
+            setTimeout(checkTigStatus, 5000);
+        } else {
+            alert('Failed to start monitoring: ' + (result.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error starting collection:', error);
+        alert('Error starting monitoring: ' + error.message);
+    }
+}
+
+// Fixed TIG collection stop function  
+async function stopTigCollection() {
+    try {
+        const response = await fetch('/tig_stop_collection', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('Monitoring stopped successfully');
+            checkTigStatus();
+        } else {
+            alert('Failed to stop monitoring: ' + (result.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error stopping collection:', error);
+        alert('Error stopping monitoring: ' + error.message);
+    }
+}
+
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>
+    async function healthCheck(){
+      const devices = Array.from(document.querySelectorAll('.device-checkbox:checked')).map(cb=>cb.value);
+      if(!devices.length){ alert('Select devices'); return; }
+      document.getElementById('healthSpinner').style.display='inline-block';
+      try {
+        const res = await fetch('/health_check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({devices})});
+        const data = await res.json();
+        renderHealthResults(data);   //  render chart + details
+      } catch(e){ alert('Health check failed: '+e.message); }
+      document.getElementById('healthSpinner').style.display='none';
+    }
+    
+    async function connectivityCheck(){
+      const devices = Array.from(document.querySelectorAll('.device-checkbox:checked')).map(cb=>cb.value);
+      if(!devices.length){ alert('Select devices'); return; }
+      document.getElementById('connectivitySpinner').style.display='inline-block';
+      try {
+        const res = await fetch('/connectivity_check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({devices})});
+        const data = await res.json();
+        renderConnectivityResults(data);   //  render online/offline cards
+      } catch(e){ alert('Connectivity check failed: '+e.message); }
+      document.getElementById('connectivitySpinner').style.display='none';
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+  // Other initialization code...
+  
+  // Health and connectivity monitoring
+  const healthBtn = document.getElementById('healthBtn');
+  const connectivityBtn = document.getElementById('connectivityBtn');
+  
+  if (healthBtn) {
+    healthBtn.addEventListener('click', healthCheck);
+  }
+  
+  if (connectivityBtn) {
+    connectivityBtn.addEventListener('click', connectivityCheck);
+  }
+});
+    
+    //  new renderers
+    function renderHealthResults(data){
+  const container = document.getElementById('monitorResults');
+  container.innerHTML = "";
+  
+  if(!data || !data.results || data.results.length === 0) {
+    container.innerHTML = '<div class="alert alert-warning">No health data available</div>';
+    return;
+  }
+
+  const labels = data.results.map(r => r.device.split(' ')[0]);
+  const cpuData = data.results.map(r => {
+    const cpu = r.cpu;
+    return (cpu !== null && cpu !== undefined && !isNaN(cpu)) ? Number(cpu) : 0;
+  });
+  const memData = data.results.map(r => {
+    const mem = r.memory;
+    return (mem !== null && mem !== undefined && !isNaN(mem)) ? Number(mem) : 0;
+  });
+
+  // Create chart container
+  const chartBox = document.createElement("div");
+  chartBox.className = "chart-box mb-4";
+  chartBox.style.cssText = `
+    background: white; 
+    border-radius: 8px; 
+    padding: 20px; 
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    height: 350px;
+  `;
+  chartBox.innerHTML = `<canvas id="healthChart_${Date.now()}" width="400" height="300"></canvas>`;
+  container.appendChild(chartBox);
+
+  const canvas = chartBox.querySelector('canvas');
+  const ctx = canvas.getContext("2d");
+  
+  // Destroy existing chart if it exists
+  if (window.healthChartInstance) {
+    try {
+      window.healthChartInstance.destroy();
+    } catch(e) {
+      console.log('Chart destroy failed:', e);
+    }
+  }
+      
+      window.healthChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            { 
+              label: 'CPU %', 
+              data: cpuData, 
+              backgroundColor: '#4a90e2',
+              borderColor: '#357abd',
+              borderWidth: 1,
+              borderRadius: 4,
+              borderSkipped: false
+            },
+            { 
+              label: 'Memory %', 
+              data: memData, 
+              backgroundColor: '#e74c3c',
+              borderColor: '#c0392b',
+              borderWidth: 1,
+              borderRadius: 4,
+              borderSkipped: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { 
+              position: 'top',
+              labels: {
+                usePointStyle: true,
+                padding: 15,
+                font: { size: 12, weight: 'bold' }
+              }
+            },
+            title: { 
+              display: true, 
+              text: 'Device Health (CPU & Memory)',
+              font: { size: 16, weight: 'bold' },
+              padding: { bottom: 20 }
+            }
+          },
+          scales: { 
+            x: {
+              grid: { display: false },
+              ticks: {
+                font: { size: 12, weight: 'bold' },
+                color: '#333'
+              }
+            },
+            y: { 
+              beginAtZero: true, 
+              max: 100,
+              grid: { 
+                color: 'rgba(0,0,0,0.1)',
+                borderDash: [2, 2]
+              },
+              ticks: {
+                font: { size: 11 },
+                callback: function(value) {
+                  return value + '%';
+                }
+              }
+            }
+          },
+          // Add data labels on bars
+          onHover: (event, activeElements) => {
+            event.native.target.style.cursor = activeElements.length > 0 ? 'pointer' : 'default';
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return context.dataset.label + ': ' + context.parsed.y + '%';
+                }
+              }
+            }
+          }
+        },
+        plugins: [{
+          afterDatasetsDraw: function(chart) {
+            const ctx = chart.ctx;
+            chart.data.datasets.forEach((dataset, i) => {
+              const meta = chart.getDatasetMeta(i);
+              meta.data.forEach((bar, index) => {
+                const value = dataset.data[index];
+                if (value > 0) {
+                  ctx.fillStyle = 'white';
+                  ctx.font = 'bold 12px Arial';
+                  ctx.textAlign = 'center';
+                  ctx.textBaseline = 'middle';
+                  
+                  const x = bar.x;
+                  const y = bar.y + (bar.height / 2);
+                  
+                  ctx.fillText(value + '%', x, y);
+                }
+              });
+            });
+          }
+        }]
+      });
+    
+      // Device details cards
+      const detailsContainer = document.createElement("div");
+      detailsContainer.className = "mt-4";
+      container.appendChild(detailsContainer);
+    
+      data.results.forEach(r => {
+        const statusColor = r.status === 'healthy' ? '#28a745' : '#dc3545';
+        const card = document.createElement("div");
+        card.className = "card mb-2";
+        card.style.cssText = `border-left: 4px solid ${statusColor}; box-shadow: 0 1px 3px rgba(0,0,0,0.1);`;
+        
+        card.innerHTML = `
+          <div class="card-body py-3">
+            <div class="row align-items-center">
+              <div class="col-md-3">
+                <div class="fw-bold">${r.device.split(' ')[0]}</div>
+                <div class="small text-muted">${r.device.match(/\((.*)\)/)?.[1] || ''}</div>
+              </div>
+              <div class="col-md-2">
+                <span class="badge px-2 py-1" style="background-color: ${statusColor}; color: white;">
+                  ${r.status === 'healthy' ? 'Healthy' : r.status}
+                </span>
+              </div>
+              <div class="col-md-2 text-center">
+                <div class="small text-muted">CPU Usage</div>
+                <div class="fw-bold fs-5">${r.cpu_text || 'N/A'}</div>
+              </div>
+              <div class="col-md-2 text-center">
+                <div class="small text-muted">Memory Usage</div>
+                <div class="fw-bold fs-5">${r.memory_text || 'N/A'}</div>
+              </div>
+              <div class="col-md-3">
+                <div class="small text-muted">Uptime</div>
+                <div class="small">${r.uptime || 'N/A'}</div>
+              </div>
+            </div>
+          </div>
+        `;
+        detailsContainer.appendChild(card);
+      });
+    }
+    function debugMonitoring() {
+    console.log('=== MONITORING DEBUG ===');
+    console.log('Device checkboxes found:', document.querySelectorAll('.device-checkbox').length);
+    console.log('Device checkboxes checked:', document.querySelectorAll('.device-checkbox:checked').length);
+    console.log('Selected devices:', getSelectedDevices());
+    console.log('Health button:', document.getElementById('healthBtn'));
+    console.log('Connectivity button:', document.getElementById('connectivityBtn'));
+    console.log('Monitor results container:', document.getElementById('monitorResults'));
+    console.log('Chart.js loaded:', typeof Chart !== 'undefined');
+    console.log('=== END DEBUG ===');
+}
+
+// Call this in console to debug
+    function renderConnectivityResults(data){
+      const container = document.getElementById('monitorResults');
+      container.innerHTML = "";
+      if(!data.results) return;
+      data.results.forEach(r=>{
+        const card = document.createElement("div");
+        card.className = "health-card card mb-2 p-2";
+        card.innerHTML = `
+          <strong>${r.device}</strong><br/>
+          ${r.reachable ? 
+            '<span class="status-online"> Online</span>' : 
+            '<span class="status-offline"> Offline</span>'}
+          <div class="small-muted">${r.message}</div>
+        `;
+        container.appendChild(card);
+      });
+    }
+    
+    // TIG Stack Integration
+    let tigConfig = {
+      influxUrl: 'http://localhost:8086',
+      grafanaUrl: 'http://localhost:3000',
+      collectionInterval: 30
+    };
+    
+    async function checkTigStatus() {
+    try {
+        console.log('Checking TIG status...');
+        
+        const response = await fetch('/tig_status', {
+            method: 'GET',
+            headers: {'Content-Type': 'application/json'}
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('TIG Status Response:', data);
+        
+        // Update service status displays
+        updateServiceStatus('influxStatus', data.influxdb || {running: false, message: 'No data'});
+        updateServiceStatus('grafanaStatus', data.grafana || {running: false, message: 'No data'});  
+        updateServiceStatus('telegrafStatus', data.telegraf || {running: false, message: 'No data'});
+        
+        // Update metrics display
+        if (data.metrics && (data.metrics.cpu_avg !== null || data.metrics.memory_avg !== null)) {
+            updateMetricsDisplay(data.metrics);
+        } else {
+            console.log('No metrics data available yet');
+            // Show that metrics are being collected but not yet available
+            const container = document.getElementById('tigMetricsContainer');
+            if (container) {
+                container.style.display = 'block';
+                const grid = document.getElementById('metricsGrid');
+                if (grid) {
+                    grid.innerHTML = `
+                        <div class="metric-card">
+                            <div class="metric-value">--</div>
+                            <div class="metric-label">CPU Average (collecting...)</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value">--</div>
+                            <div class="metric-label">Memory Average (collecting...)</div>
+                        </div>
+                    `;
+                }
+            }
+        }
+        
+        // Setup Grafana embed if Grafana is running
+        if (data.grafana && data.grafana.running) {
+            setupGrafanaEmbed();
+        }
+        
+    } catch (error) {
+        console.error('TIG status check failed:', error);
+        updateServiceStatus('influxStatus', {running: false, message: 'Connection failed'});
+        updateServiceStatus('grafanaStatus', {running: false, message: 'Connection failed'}); 
+        updateServiceStatus('telegrafStatus', {running: false, message: 'Connection failed'});
+    }
+}
+
+function updateServiceStatus(elementId, status) {
+    const element = document.getElementById(elementId);
+    if (!element) {
+        console.warn(`Element ${elementId} not found`);
+        return;
+    }
+    
+    element.innerHTML = '';
+    
+    const indicator = document.createElement('span');
+    indicator.className = 'status-indicator';
+    
+    const statusText = document.createElement('span');
+    statusText.style.marginLeft = '8px';
+    
+    if (status && status.running) {
+        indicator.className += ' status-running';
+        statusText.innerHTML = `<strong>Running</strong> - ${status.message || 'OK'}`;
+        statusText.style.color = '#28a745';
+    } else {
+        indicator.className += ' status-stopped';
+        statusText.innerHTML = `<strong>Stopped</strong> - ${status.message || 'Not running'}`;
+        statusText.style.color = '#dc3545';
+    }
+    
+    element.appendChild(indicator);
+    element.appendChild(statusText);
+}
+
+
+    // Add this new function after updateServiceStatus
+    function updateMetricsDisplay(metrics) {
+    console.log('Updating metrics display with:', metrics);
+
+    const container = document.getElementById('tigMetricsContainer');
+    if (container) {
+        container.style.display = 'block';
+    
+        const grid = document.getElementById('metricsGrid');
+        if (grid) {
+            grid.innerHTML = `
+                <div class="metric-card">
+                    <div class="metric-value">${metrics.cpu_avg !== null ? metrics.cpu_avg + '%' : 'N/A'}</div>
+                    <div class="metric-label">Average CPU Usage</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${metrics.memory_avg !== null ? metrics.memory_avg + '%' : 'N/A'}</div>
+                    <div class="metric-label">Average Memory Usage</div>
+                </div>
+                ${metrics.points_24h ? `
+                <div class="metric-card">
+                    <div class="metric-value">${metrics.points_24h}</div>
+                    <div class="metric-label">Data Points (24h)</div>
+                </div>` : ''}
+            `;
+        }
+    }
+}
+    
+function setupGrafanaEmbed() {
+    const container = document.getElementById('grafanaContainer');
+    const embed = document.getElementById('grafanaEmbed');
+    const link = document.getElementById('grafanaLink');
+    
+    if (!container || !embed || !link) {
+        console.error('Grafana container elements not found');
+        return;
+    }
+    
+    const host = window.location.hostname;                    // ← 192.168.29.86
+  const input = document.getElementById('grafanaUrl');
+  const base = (input?.value && input.value.trim()) ? input.value.trim()
+            : `http://${host}:3000`;                        // ← no more localhost
+  const grafanaUrl = base.replace(/\/+$/, '');
+
+  const dashboardUrl = `${grafanaUrl}/d-solo/network-monitoring/network-monitoring?orgId=1&panelId=1&kiosk`;
+  const fullUrl      = `${grafanaUrl}/d/network-monitoring/network-monitoring`
+    
+    embed.src = dashboardUrl;
+    link.href = fullUrl;
+    container.style.display = 'block';
+    
+    console.log('Grafana embed setup:', dashboardUrl);
+}
+    
+    function displayDeviceMetrics(metrics) {
+      const grid = document.getElementById('metricsGrid');
+      const container = document.getElementById('tigMetricsContainer');
+      
+      grid.innerHTML = '';
+      
+      Object.entries(metrics).forEach(([device, data]) => {
+        const card = document.createElement('div');
+        card.className = 'metric-card';
+        card.innerHTML = `
+          <div class="metric-value">${data.cpu || 'N/A'}%</div>
+          <div class="metric-label">CPU - ${device}</div>
+        `;
+        grid.appendChild(card);
+        
+        const memCard = document.createElement('div');
+        memCard.className = 'metric-card';
+        memCard.innerHTML = `
+          <div class="metric-value">${data.memory || 'N/A'}%</div>
+          <div class="metric-label">Memory - ${device}</div>
+        `;
+        grid.appendChild(memCard);
+      });
+      
+      container.style.display = 'block';
+    }
+    
+    async function saveTigConfig() {
+      const config = {
+        influxUrl: document.getElementById('influxUrl').value,
+        grafanaUrl: document.getElementById('grafanaUrl').value,
+        collectionInterval: parseInt(document.getElementById('collectionInterval').value)
+      };
+      
+      try {
+        const response = await fetch('/tig_config', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(config)
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          tigConfig = config;
+          alert('TIG configuration saved successfully');
+        } else {
+          alert('Failed to save configuration: ' + result.error);
+        }
+      } catch (error) {
+        alert('Error saving configuration: ' + error.message);
+      }
+    }
+    
+    async function startTigServices() {
+    try {
+        console.log('Starting TIG services...');
+        
+        const response = await fetch('/start_tig_stack', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('TIG stack services started. Checking status...');
+            // Wait a moment then check status
+            setTimeout(() => {
+                checkTigStatus();
+            }, 3000);
+        } else {
+            alert('Failed to start TIG services: ' + (result.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error starting TIG services:', error);
+        alert('Error starting services: ' + error.message);
+    }
+}
+
+    async function startTigCollection() {
+      const devices = getSelectedDevices();
+      if (!devices.length) {
+        alert('Please select devices to monitor');
+        return;
+      }
+      
+      try {
+        const response = await fetch('/tig_start', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({devices: devices})
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('TIG monitoring started for selected devices');
+          checkTigStatus();
+        } else {
+          alert('Failed to start monitoring: ' + result.error);
+        }
+      } catch (error) {
+        alert('Error starting monitoring: ' + error.message);
+      }
+    }
+    
+    async function stopTigCollection() {
+      try {
+        const response = await fetch('/tig_stop', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'}
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('TIG monitoring stopped');
+          checkTigStatus();
+        } else {
+          alert('Failed to stop monitoring: ' + result.error);
+        }
+      } catch (error) {
+        alert('Error stopping monitoring: ' + error.message);
+      }
+    }
+
+    async function testInfluxWrite() {
+    try {
+        const response = await fetch('/tig_test_data', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('Test data written successfully to InfluxDB!');
+            console.log('InfluxDB config:', result.config);
+            // Check status to see if metrics appear
+            setTimeout(checkTigStatus, 2000);
+        } else {
+            alert('Failed to write test data: ' + (result.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('InfluxDB test failed:', error);
+        alert('InfluxDB test failed: ' + error.message);
+    }
+}
+    
+    async function stopTigServices() {
+    try {
+        console.log('Stopping TIG services...');
+        
+        const response = await fetch('/stop_tig_stack', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('TIG stack services stopped.');
+            checkTigStatus();
+        } else {
+            alert('Failed to stop TIG services: ' + (result.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error stopping TIG services:', error);
+        alert('Error stopping services: ' + error.message);
+    }
+}
+   
+    // Event listeners for TIG panel
+    //javascriptdocument.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', () => {
+    const tigStatusBtn = document.getElementById('tigStatusBtn');
+    const tigStartBtn = document.getElementById('tigStartServicesBtn');
+    const tigStopBtn = document.getElementById('tigStopServicesBtn');
+    const tigConfigBtn = document.getElementById('tigConfigBtn');
+    
+    if (tigStatusBtn) tigStatusBtn.addEventListener('click', checkTigStatus);
+    if (tigStartBtn) tigStartBtn.addEventListener('click', startTigServices);
+    if (tigStopBtn) tigStopBtn.addEventListener('click', stopTigServices);
+    if (tigConfigBtn) tigConfigBtn.addEventListener('click', () => {
+        const container = document.getElementById('tigConfigContainer');
+        container.style.display = container.style.display === 'none' ? 'block' : 'none';
+    });
+});
+    // Add this inside your existing DOMContentLoaded event listener
+// Update the event listener for the start button
+    const tigStartMonitoringBtn = document.getElementById('tigStartMonitoringBtn');
+    if (tigStartMonitoringBtn) {
+        tigStartMonitoringBtn.innerHTML = '<i class="fas fa-play"></i> Start TIG Services';
+        tigStartMonitoringBtn.addEventListener('click', startTigServices);
+    }
+        if (!selectedDevices.length) {
+          alert('Please select devices to monitor first');
+          return;
+        }
+        
+        try {
+          showSpinner('tigStatusSpinner');
+          
+          const response = await fetch('/start_device_monitoring', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({devices: selectedDevices})
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            alert(`Started monitoring ${selectedDevices.length} device(s). Data will appear in a few minutes.`);
+            // Check status after 10 seconds to show initial metrics
+            setTimeout(() => {
+              checkTigStatus();
+            }, 10000);
+          } else {
+            alert('Failed to start monitoring: ' + (result.error || 'Unknown error'));
+          }
+        } catch (error) {
+          alert('Error starting monitoring: ' + error.message);
+          console.error('Start monitoring error:', error);
+        } finally {
+          hideSpinner('tigStatusSpinner');
+        }
+    
+    
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+      // ====== PDF helpers & run state ======
+      window.lastExecRun = null;
+      window.lastVerifyRun = null;
+      
+      function _nowStamp() {
+        const d = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+      }
+      
+      function _inferCommandUse(cmd="") {
+        const c = cmd.toLowerCase().trim();
+        // Very lightweight heuristics; extend as you like:
+        if (c.startsWith('show run') || c.startsWith('show running')) return 'Show current running configuration';
+        if (c.startsWith('show ip int') || c.startsWith('show interfaces')) return 'Show interface status and IP info';
+        if (c.startsWith('ping')) return 'Connectivity test (ICMP echo)';
+        if (c.startsWith('copy run start') || c.startsWith('copy running')) return 'Save running config to startup';
+        if (c.startsWith('conf t') || c.startsWith('configure terminal')) return 'Enter global configuration mode';
+        if (c.startsWith('interface ')) return 'Enter interface configuration';
+        if (c.startsWith('no ')) return 'Remove/disable a setting';
+        return 'Command execution';
+      }
+      
+      function _addWrapped(doc, text, x, y, maxWidth, lineH, pageH, bottomMargin) {
+        const lines = doc.splitTextToSize(text, maxWidth);
+        for (const ln of lines) {
+          if (y > pageH - bottomMargin) {
+            doc.addPage(); y = 60;
+          }
+          doc.text(ln, x, y);
+          y += lineH;
+        }
+        return y;
+      }
+      
+      function downloadRunPdf(run, kind /* 'EXECUTE' | 'VERIFY' */) {
+        if (!run) { alert('No results to export yet. Execute/Verify first.'); return; }
+        const { jsPDF } = window.jspdf || {};
+        if (!jsPDF) { alert('jsPDF not loaded'); return; }
+        const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+        const pageW = doc.internal.pageSize.getWidth();
+        const pageH = doc.internal.pageSize.getHeight();
+        const left = 50, right = 50, top = 60, bottom = 60, width = pageW - left - right;
+        let y = top;
+      
+        // Header
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+        y = _addWrapped(doc, `Network Configuration Manager ${kind} Summary`, left, y, width, 18, pageH, bottom);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+        y += 8;
+        y = _addWrapped(doc, `Date: ${new Date(run.timestamp).toString()}`, left, y, width, 14, pageH, bottom);
+        y = _addWrapped(doc, `Devices: ${run.devices.join(', ')}`, left, y, width, 14, pageH, bottom);
+        y += 6;
+      
+        // Purpose (use the user's prompt as "what is the use")
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+        y = _addWrapped(doc, 'Purpose:', left, y, width, 16, pageH, bottom);
+        doc.setFont('helvetica', 'normal');
+        y = _addWrapped(doc, run.prompt || '(not provided)', left, y, width, 14, pageH, bottom);
+        y += 8;
+      
+        // Results per device
+        (run.results || []).forEach((r, idx) => {
+          if (idx > 0) y += 6;
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+          y = _addWrapped(doc, `Device: ${r.device}`, left, y, width, 16, pageH, bottom);
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+      
+          const status = r.success ? 'Success' : 'Failed';
+          y = _addWrapped(doc, `Status: ${status}${r.message ? `  ${r.message}` : ''}`, left, y, width, 14, pageH, bottom);
+      
+          // Commands & outputs
+          if (Array.isArray(r.command_outputs) && r.command_outputs.length) {
+            y += 6;
+            doc.setFont('helvetica', 'bold');
+            y = _addWrapped(doc, 'Commands & Output:', left, y, width, 16, pageH, bottom);
+            doc.setFont('helvetica', 'normal');
+            r.command_outputs.forEach((co, j) => {
+              const cmd = (co.command || '').trim();
+              const out = (co.output || '').trim();
+              //y = _addWrapped(doc, `â€¢ Command: ${cmd}`, left, y, width, 14, pageH, bottom);
+              y = _addWrapped(doc, `• Command: ${cmd}`, left, y, width, 14, pageH, bottom);
+              y = _addWrapped(doc, `  Use: ${_inferCommandUse(cmd)}`, left, y, width, 14, pageH, bottom);
+              // Limit extremely long outputs (tweak as needed)
+              const MAX = 4000;
+              const outText = out.length > MAX ? out.slice(0, MAX) + ' â€¦(truncated)' : out || '(no output)';
+              y = _addWrapped(doc, `  Output:\n${outText}`, left + 12, y, width - 12, 14, pageH, bottom);
+              y += 4;
+            });
+          }
+      
+          // Config diff (if present)
+          if (r.config_diff) {
+            y += 6;
+            doc.setFont('helvetica', 'bold');
+            y = _addWrapped(doc, 'Configuration Diff:', left, y, width, 16, pageH, bottom);
+            doc.setFont('helvetica', 'normal');
+            y = _addWrapped(doc, r.config_diff, left + 12, y, width - 12, 14, pageH, bottom);
+          }
+        });
+      
+        // Footer page numbers
+        const pages = doc.internal.getNumberOfPages();
+        for (let p = 1; p <= pages; p++) {
+          doc.setPage(p);
+          doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+          doc.text(String(p), pageW - right, pageH - 20, { align: 'right' });
+        }
+      
+        const fname = `${kind.toLowerCase()}_summary_${_nowStamp()}.pdf`;
+        doc.save(fname);
+      }
+      
+      // ====== Wire buttons once DOM is ready ======
+      document.addEventListener('DOMContentLoaded', () => {
+    // Wait for DOM to be fully ready, then attach event listeners
+    setTimeout(() => {
+        const healthBtn = document.getElementById('healthBtn');
+        const connectivityBtn = document.getElementById('connectivityBtn');
+        
+        if (healthBtn) {
+            // Remove any existing listeners
+            healthBtn.replaceWith(healthBtn.cloneNode(true));
+            document.getElementById('healthBtn').addEventListener('click', healthCheck);
+            console.log('Health button event listener attached');
+        } else {
+            console.error('Health button not found');
+        }
+        
+        if (connectivityBtn) {
+            // Remove any existing listeners  
+            connectivityBtn.replaceWith(connectivityBtn.cloneNode(true));
+            document.getElementById('connectivityBtn').addEventListener('click', connectivityCheck);
+            console.log('Connectivity button event listener attached');
+        } else {
+            console.error('Connectivity button not found');
+        }
+    }, 100);
+});
+    
+document.addEventListener('DOMContentLoaded', () => {
+    // TIG panel event listeners
+    const tigStatusBtn = document.getElementById('tigStatusBtn');
+    const tigStartServicesBtn = document.getElementById('tigStartServicesBtn');
+    const tigStopServicesBtn = document.getElementById('tigStopServicesBtn');
+    const tigConfigBtn = document.getElementById('tigConfigBtn');
+    const tigSaveConfigBtn = document.getElementById('tigSaveConfigBtn');
+    const tigStartBtn = document.getElementById('tigStartBtn');
+    const tigStopBtn = document.getElementById('tigStopBtn');
+    
+    if (tigStatusBtn) {
+        tigStatusBtn.addEventListener('click', checkTigStatus);
+    }
+    
+    if (tigStartServicesBtn) {
+        tigStartServicesBtn.addEventListener('click', startTigServices);
+    }
+    
+    if (tigStopServicesBtn) {
+        tigStopServicesBtn.addEventListener('click', stopTigServices);
+    }
+    
+    if (tigConfigBtn) {
+        tigConfigBtn.addEventListener('click', () => {
+            const container = document.getElementById('tigConfigContainer');
+            if (container) {
+                container.style.display = container.style.display === 'none' ? 'block' : 'none';
+            }
+        });
+    }
+    
+    if (tigSaveConfigBtn) {
+        tigSaveConfigBtn.addEventListener('click', saveTigConfig);
+    }
+    
+    if (tigStartBtn) {
+        tigStartBtn.addEventListener('click', startTigCollection);
+    }
+    
+    if (tigStopBtn) {
+        tigStopBtn.addEventListener('click', stopTigCollection);
+    }
+    
+    // Add test button for debugging (you can remove this later)
+    const testBtn = document.createElement('button');
+    testBtn.textContent = 'Test InfluxDB Write';
+    testBtn.className = 'btn btn-info btn-sm ms-2';
+    testBtn.onclick = testInfluxWrite;
+    
+    const tigConfigContainer = document.getElementById('tigConfigContainer');
+    if (tigConfigContainer) {
+        tigConfigContainer.appendChild(testBtn);
+    }
+    
+    // Automatically check TIG status when the panel is first opened
+    setTimeout(checkTigStatus, 1000);
+});
+
+document.getElementById('tigStatusBtn').addEventListener('click', async () => {
+  const res = await fetch('/api/tig/status');
+  const data = await res.json();
+  updateTigUI(data);
+});
+
+document.getElementById('tigStartServicesBtn').addEventListener('click', async () => {
+  const res = await fetch('/api/tig/start', {method:'POST'});
+  const data = await res.json();
+  alert("TIG services started: " + JSON.stringify(data));
+});
+
+document.getElementById('tigStopServicesBtn').addEventListener('click', async () => {
+  const res = await fetch('/api/tig/stop', {method:'POST'});
+  const data = await res.json();
+  alert("TIG services stopped: " + JSON.stringify(data));
+});
+
+function updateTigUI(data) {
+  if (data.influxdb_running) {
+    document.getElementById('influxStatus').innerHTML =
+      '<span class="status-indicator status-running"></span> Running';
+  } else {
+    document.getElementById('influxStatus').innerHTML =
+      '<span class="status-indicator status-stopped"></span> Stopped';
+  }
+  if (data.grafana_running) {
+    document.getElementById('grafanaStatus').innerHTML =
+      '<span class="status-indicator status-running"></span> Running';
+  } else {
+    document.getElementById('grafanaStatus').innerHTML =
+      '<span class="status-indicator status-stopped"></span> Stopped';
+  }
+  if (data.telegraf_running) {
+    document.getElementById('telegrafStatus').innerHTML =
+      '<span class="status-indicator status-running"></span> Running';
+  } else {
+    document.getElementById('telegrafStatus').innerHTML =
+      '<span class="status-indicator status-stopped"></span> Stopped';
+  }
+}
+
+
+      </script>
+<script>
+  // Helper: show/hide sections
+  function show(el) { el.style.display = ''; }
+  function hide(el) { el.style.display = 'none'; }
+
+  // Elements we already have in your HTML
+  const tigStatusBtn = document.getElementById('tigStatusBtn');
+  const grafanaContainer = document.getElementById('grafanaContainer');
+  const grafanaEmbed = document.getElementById('grafanaEmbed');
+  const grafanaLink = document.getElementById('grafanaLink');
+
+  // Update the three status rows based on booleans
+  function paintStatus(el, running) {
+    el.innerHTML = (running
+      ? '<span class="status-indicator status-running"></span> Running'
+      : '<span class="status-indicator status-stopped"></span> Stopped');
+  }
+
+  async function fetchJSON(url, opts) {
+    const r = await fetch(url, opts);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  }
+
+  async function refreshTIGAndEmbed() {
+    try {
+      // 1) Get service status + grafana_url
+      const info = await fetchJSON('/api/tig/info');
+
+      // Paint status lights
+      paintStatus(document.getElementById('influxStatus'), !!info.influxdb_running);
+      paintStatus(document.getElementById('grafanaStatus'), !!info.grafana_running);
+      paintStatus(document.getElementById('telegrafStatus'), !!info.telegraf_running);
+
+      // 2) Only try to embed Grafana if it's running
+      if (!info.grafana_running) {
+        hide(grafanaContainer);
+        return;
+      }
+
+      // 3) Get dashboards from grafana.db (most recent first)
+      const dashboardsResp = await fetchJSON('/api/tig/dashboards');
+      const dashboards = dashboardsResp.dashboards || [];
+      if (!dashboards.length) {
+        hide(grafanaContainer);
+        return;
+      }
+
+      // Pick the newest updated dashboard
+      const dash = dashboards[0];
+
+      // Build Grafana embed URL
+      // You can tweak orgId/refresh/time range as needed
+      const orgId = 1;
+      const url = `${info.grafana_url}/d/${dash.uid}?orgId=${orgId}&refresh=30s&kiosk`;
+
+      // 4) Embed and show
+      grafanaEmbed.src = url;
+      grafanaLink.href = url;
+      show(grafanaContainer);
+
+    } catch (e) {
+      console.warn('TIG/Grafana check failed:', e);
+      hide(grafanaContainer);
+    }
+  }
+ 
+  // Hook the TIG "Check Status" button
+  if (tigStatusBtn) {
+    tigStatusBtn.addEventListener('click', refreshTIGAndEmbed);
+  }
+  // Add this to your frontend HTML/JavaScript
+function createDashboard() {
+    fetch('/create_dashboard', {method: 'POST'})
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Dashboard created successfully!');
+        } else {
+            alert('Dashboard creation failed: ' + data.error);
+        }
+    });
+}
+
+function startTIGWithDashboard() {
+    fetch('/start_tig_with_dashboard', {method: 'POST'})
+    .then(response => response.json())
+    .then(data => {
+        console.log('TIG + Dashboard result:', data);
+        // Handle response
+    });
+}
+// Simple loading helper functions
+
+</script>
+
+    </body>
+    </html>
+    
