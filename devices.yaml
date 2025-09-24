@@ -1,0 +1,85 @@
+devices:
+  - name: MLMV-540-PE1
+    ip: "10.253.22.93"
+    device_type: "cisco_xr"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+
+  - name: MLMV-55A1-P4
+    ip: "10.253.22.91"
+    device_type: "cisco_xr"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+
+  - name: MLMV-55A1-P5
+    ip: "10.253.22.92"
+    device_type: "cisco_xr"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+
+  - name: MLMV-57C3-P6
+    ip: "10.235.6.11"
+    device_type: "cisco_xr"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+
+  - name: MLMV-57C3-P7
+    ip: "10.235.6.12"
+    device_type: "cisco_xr"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+
+  - name: MLMV-540-P8
+    ip: "10.253.22.73"
+    device_type: "cisco_xr"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+
+  - name: MLMV-540-P9
+    ip: "10.253.22.74"
+    device_type: "cisco_xr"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+
+  - name: MLMV-540-PE10
+    ip: "10.253.22.94"
+    device_type: "cisco_xr"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+
+  - name: MLMV-MX304-PE3
+    ip: "10.235.6.30"
+    device_type: "juniper_junos"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+
+  - name: MLMV-MX104-PE12
+    ip: "10.253.22.80"
+    device_type: "juniper_junos"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+
+  - name: MLMV-RR-BGP1
+    ip: "10.254.116.15"
+    device_type: "cisco_xr"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+
+  - name: MLMV-RR-BGP2
+    ip: "10.254.116.16"
+    device_type: "cisco_xr"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+
+  - name: R1
+    ip: "192.168.29.205"
+    device_type: "cisco_ios"
+    username: "cisco"
+    password: "admin"
+
+  - name: XR1
+    ip: "192.168.29.161"
+    device_type: "cisco_xr"
+    port: "22"
+    username: "cisco"
+    password: "admin123"
